@@ -7,11 +7,14 @@ import 'package:sentinela/core/engine/alert_machine.dart';
 import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/data/repository/poi_repository.dart';
 import 'package:sentinela/features/overlay/services/overlay_service.dart';
+import 'package:sentinela/features/stats/models/passage_record.dart';
+import 'package:sentinela/features/stats/repository/passage_repository.dart';
 
 class MockPoiRepository extends Mock implements PoiRepository {}
 class MockAlertMachine extends Mock implements AlertMachine {}
 class MockAudioAlertPlayer extends Mock implements AudioAlertPlayer {}
 class MockOverlayService extends Mock implements OverlayService {}
+class MockPassageRepository extends Mock implements PassageRepository {}
 
 void main() {
   late MockPoiRepository mockRepository;
@@ -43,6 +46,13 @@ void main() {
       isOverSpeed: false,
       targetBearing: 0,
       relativeBearing: 0,
+    ));
+    registerFallbackValue(PassageRecord(
+      poiId: 0,
+      poiType: PoiType.fixedRadar,
+      vehicleSpeedKmh: 0,
+      timestamp: DateTime(2026, 1, 1),
+      isOverSpeed: false,
     ));
   });
 
@@ -241,6 +251,92 @@ void main() {
       await trackingService.dispose();
       expect(trackingService.isRunning, isFalse);
 
+      await gpsController.close();
+    });
+
+    test('deve gravar passagem no PassageRepository ao concluir alerta', () async {
+      final mockPassageRepo = MockPassageRepository();
+      when(() => mockPassageRepo.insertPassage(any())).thenAnswer((_) async => 1);
+
+      final serviceWithPassages = BackgroundTrackingService(
+        repository: mockRepository,
+        alertMachine: mockAlertMachine,
+        audioPlayer: mockAudioPlayer,
+        overlayService: mockOverlayService,
+        passageRepository: mockPassageRepo,
+      );
+
+      final gpsController = StreamController<VehiclePosition>();
+
+      const poi = PoiPoint(
+        id: 77,
+        latitude: -23.5,
+        longitude: -46.6,
+        type: PoiType.fixedRadar,
+        speedLimit: 60,
+        roadName: 'Av. Paulista',
+      );
+
+      const alert = ActiveAlert(
+        poi: poi,
+        distanceMeters: 50,
+        currentSpeedKmh: 65,
+        status: AlertStatus.overSpeed,
+        isOverSpeed: true,
+        targetBearing: 0,
+        relativeBearing: 0,
+      );
+
+      when(() => mockRepository.findNearbyPois(
+            latitude: any(named: 'latitude'),
+            longitude: any(named: 'longitude'),
+            radiusMeters: any(named: 'radiusMeters'),
+          )).thenAnswer((_) async => [poi]);
+
+      when(() => mockAlertMachine.updatePosition(any(), any())).thenReturn(null);
+
+      // 1ª Coordenada: Alerta ativo
+      when(() => mockAlertMachine.state).thenReturn(
+        const AlertState(status: AlertStatus.overSpeed, activeAlert: alert),
+      );
+
+      await serviceWithPassages.startTracking(gpsController.stream);
+
+      final pos1 = VehiclePosition(
+        latitude: -23.5,
+        longitude: -46.6,
+        speedKmh: 65,
+        bearing: 0,
+        accuracyMeters: 5,
+        timestamp: DateTime(2026, 10, 30, 10, 0),
+      );
+      gpsController.add(pos1);
+      await pumpEventQueue();
+
+      expect(serviceWithPassages.currentAlert, equals(alert));
+
+      // 2ª Coordenada: Passagem concluída (passed)
+      when(() => mockAlertMachine.state).thenReturn(
+        const AlertState(status: AlertStatus.passed, activeAlert: null),
+      );
+
+      final pos2 = VehiclePosition(
+        latitude: -23.501,
+        longitude: -46.6,
+        speedKmh: 62,
+        bearing: 0,
+        accuracyMeters: 5,
+        timestamp: DateTime(2026, 10, 30, 10, 0, 5),
+      );
+      gpsController.add(pos2);
+      await pumpEventQueue();
+
+      verify(() => mockPassageRepo.insertPassage(any(that: isA<PassageRecord>()
+          .having((p) => p.poiId, 'poiId', 77)
+          .having((p) => p.isOverSpeed, 'isOverSpeed', true)
+          .having((p) => p.roadName, 'roadName', 'Av. Paulista')))).called(1);
+
+      await serviceWithPassages.dispose();
       await gpsController.close();
     });
   });

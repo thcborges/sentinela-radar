@@ -1,3 +1,4 @@
+import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,10 +10,12 @@ import 'package:sentinela/data/repository/poi_repository.dart';
 import 'package:sentinela/data/sync/poi_sync_service.dart';
 import 'package:sentinela/features/dashboard/bloc/dashboard_cubit.dart';
 import 'package:sentinela/features/dashboard/screens/dashboard_screen.dart';
+import 'package:sentinela/features/stats/bloc/stats_cubit.dart';
 
 class MockPoiRepository extends Mock implements PoiRepository {}
 class MockAlertMachine extends Mock implements AlertMachine {}
 class MockPoiSyncService extends Mock implements PoiSyncService {}
+class MockStatsCubit extends MockCubit<StatsState> implements StatsCubit {}
 
 void main() {
   late MockPoiRepository mockRepo;
@@ -146,8 +149,12 @@ void main() {
     });
 
     testWidgets('deve renderizar layout landscape quando a orientação da tela for horizontal', (tester) async {
+      tester.view.physicalSize = const Size(800, 400);
+      tester.view.devicePixelRatio = 1.0;
       await tester.binding.setSurfaceSize(const Size(800, 400));
       addTearDown(() async {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
         await tester.binding.setSurfaceSize(null);
       });
 
@@ -164,6 +171,31 @@ void main() {
 
       expect(find.byKey(const Key('dashboard_speedometer')), findsOneWidget);
       expect(find.byKey(const Key('dashboard_sonar')), findsOneWidget);
+    });
+
+    testWidgets('deve navegar para a tela de estatísticas ao tocar no botão de analytics', (tester) async {
+      final mockStats = MockStatsCubit();
+      when(() => mockStats.state).thenReturn(const StatsState());
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: BlocProvider<DashboardCubit>.value(
+            value: dashboardCubit,
+            child: DashboardScreen(
+              syncService: mockSyncService,
+              statsCubit: mockStats,
+            ),
+          ),
+        ),
+      );
+
+      final analyticsButton = find.byIcon(Icons.analytics_rounded);
+      expect(analyticsButton, findsOneWidget);
+      await tester.tap(analyticsButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Estatísticas de Condução'), findsOneWidget);
     });
   });
 }

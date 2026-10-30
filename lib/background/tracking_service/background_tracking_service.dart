@@ -4,16 +4,20 @@ import '../../core/engine/alert_machine.dart';
 import '../../core/models/poi_model.dart';
 import '../../data/repository/poi_repository.dart';
 import '../../features/overlay/services/overlay_service.dart';
+import '../../features/stats/models/passage_record.dart';
+import '../../features/stats/repository/passage_repository.dart';
 
 /// Serviço orquestrador de rastreamento em segundo plano (Foreground Service).
 /// Responsável por manter o GPS ativo de forma persistente (mesmo minimizado ou
 /// sob o Waze/Google Maps), consultar o banco SQLite R*Tree, acionar a máquina
-/// de estados de alerta, despachar avisos por voz/bipe e sincronizar a miniatura flutuante.
+/// de estados de alerta, despachar avisos por voz/bipe, sincronizar a miniatura
+/// flutuante e salvar histórico de passagens 100% privado.
 class BackgroundTrackingService {
   final PoiRepository _repository;
   final AlertMachine _alertMachine;
   final AudioAlertPlayer _audioPlayer;
   final OverlayService _overlayService;
+  final PassageRepository? _passageRepository;
 
   bool isVoiceEnabled;
   bool isBeepEnabled;
@@ -32,6 +36,7 @@ class BackgroundTrackingService {
     required AlertMachine alertMachine,
     required AudioAlertPlayer audioPlayer,
     required OverlayService overlayService,
+    PassageRepository? passageRepository,
     this.isVoiceEnabled = true,
     this.isBeepEnabled = true,
     Set<PoiType>? enabledPoiTypes,
@@ -39,6 +44,7 @@ class BackgroundTrackingService {
         _alertMachine = alertMachine,
         _audioPlayer = audioPlayer,
         _overlayService = overlayService,
+        _passageRepository = passageRepository,
         enabledPoiTypes = enabledPoiTypes ?? Set.from(PoiType.values);
 
   bool get isRunning => _isRunning;
@@ -81,12 +87,31 @@ class BackgroundTrackingService {
         .toList();
 
     // 3. Atualiza a máquina de estados de alerta
+    final previousAlert = _currentAlert;
     _alertMachine.updatePosition(position, filteredPois);
     final alert = _alertMachine.state.activeAlert;
     _currentAlert = alert;
     _alertController.add(alert);
 
-    // 4. Dispara alerta sonoro e vocal via TTS
+    // 4. Salva passagem no histórico privado ao concluir passagem pelo ponto
+    final hasPassedPoint = previousAlert != null &&
+        (alert == null ||
+            alert.poi.id != previousAlert.poi.id ||
+            _alertMachine.state.status == AlertStatus.passed);
+
+    if (hasPassedPoint) {
+      _passageRepository?.insertPassage(PassageRecord(
+        poiId: previousAlert.poi.id,
+        poiType: previousAlert.poi.type,
+        vehicleSpeedKmh: position.speedKmh,
+        speedLimit: previousAlert.poi.speedLimit,
+        timestamp: position.timestamp,
+        isOverSpeed: previousAlert.isOverSpeed,
+        roadName: previousAlert.poi.roadName,
+      ));
+    }
+
+    // 5. Dispara alerta sonoro e vocal via TTS
     if (alert != null) {
       await _audioPlayer.playAlert(
         alert,
@@ -95,7 +120,7 @@ class BackgroundTrackingService {
       );
     }
 
-    // 5. Envia dados para o Overlay Flutuante / Dynamic Island
+    // 6. Envia dados para o Overlay Flutuante / Dynamic Island
     await _overlayService.updateOverlayData(
       speedKmh: position.speedKmh,
       alert: alert,

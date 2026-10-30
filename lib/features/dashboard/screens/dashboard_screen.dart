@@ -7,14 +7,18 @@ import 'package:sentinela/features/dashboard/widgets/alert_banner_m3.dart';
 import 'package:sentinela/features/dashboard/widgets/sonar_radar_m3.dart';
 import 'package:sentinela/features/dashboard/widgets/speedometer_m3.dart';
 import 'package:sentinela/features/settings/screens/settings_screen.dart';
+import 'package:sentinela/features/stats/bloc/stats_cubit.dart';
+import 'package:sentinela/features/stats/screens/stats_screen.dart';
 
 /// Tela Principal do Motorista (Dark HUD / Material Design 3)
 class DashboardScreen extends StatelessWidget {
   final PoiSyncService syncService;
+  final StatsCubit? statsCubit;
 
   const DashboardScreen({
     super.key,
     required this.syncService,
+    this.statsCubit,
   });
 
   @override
@@ -30,6 +34,21 @@ class DashboardScreen extends StatelessWidget {
           ),
         ),
         actions: [
+          if (statsCubit != null)
+            IconButton(
+              icon: const Icon(Icons.analytics_rounded),
+              tooltip: 'Estatísticas',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => BlocProvider.value(
+                      value: statsCubit!,
+                      child: const StatsScreen(),
+                    ),
+                  ),
+                );
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.settings_rounded),
             tooltip: 'Configurações',
