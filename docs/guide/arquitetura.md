@@ -124,6 +124,31 @@ Integrado diretamente ao painel principal do motorista, o serviço de diagnósti
 
 ---
 
+## 🚘 Modo Espelho HUD para Para-brisa (Condução Noturna)
+
+O painel suporta projeção direta no para-brisa do veículo (*Head-Up Display* reflexivo):
+* **Inversão Geométrica Horizontal:** O layout do velocímetro e alertas é espelhado no eixo horizontal através de transformação matricial `Transform(alignment: Alignment.center, transform: Matrix4.rotationY(pi), child: ...)`. Ao apoiar o smartphone no painel do carro à noite, a imagem refletida no vidro do para-brisa aparece perfeitamente orientada e legível para o motorista.
+* **Contraste Puro OLED Black (`#000000`):** As superfícies e fundos mudam para preto absoluto, eliminando o ofuscamento visual noturno e reduzindo o consumo de energia em telas OLED.
+
+---
+
+## 🔊 Síntese Tonal de Proximidade & Efeito Sonar (`ToneGeneratorInterface`)
+
+Além dos avisos falados por voz TTS, o Sentinela incorpora emissão de bipes sintetizados com frequências diferenciadas:
+* **Tom de Aproximação (880 Hz / 80 ms):** Disparado em cadência proporcional à proximidade do radar ou lombada com velocidade compatível.
+* **Tom Crítico de Excesso (1200 Hz / 120 ms):** Tom agudo urgente emitido quando o condutor está em excesso de velocidade na aproximação do ponto fiscalizado.
+* **Ports & Adapters (`ToneGeneratorInterface`):** Abstração que isola os canais de hardware (`PlatformToneGenerator`) com `FakeToneGenerator` para execução hermética na suíte de testes em Linux/CI sem dependências de áudio nativo.
+
+---
+
+## 🛣️ Tarifação e Estimativa de Pedágio Free Flow (`TollRateEstimator`)
+
+Para rodovias pedagiadas convencionais e modernos pórticos eletrônicos **Free Flow**:
+* **Estimativa Determinística Offline:** Mapeamento de tarifas de referência sem dependência de internet, calibrado por categoria veicular (`VehicleCategory`: passeio, motocicleta, comercial e caminhão pesado).
+* **Resumo de Viagem e Custos Acumulados (`TripTollSummary`):** Integração com `PassageRecord` e `PassageRepository`, registrando tarifas individuais e total acumulado em pedágios no painel de estatísticas privadas do motorista.
+
+---
+
 ## 🚀 Cópia Segura no Primeiro Boot (`SeedDatabaseLoader`)
 
 Para garantir operação 100% offline imediata no primeiro boot sem exigir download de rede:

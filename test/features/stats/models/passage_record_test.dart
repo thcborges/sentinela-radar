@@ -15,6 +15,7 @@ void main() {
         timestamp: now,
         isOverSpeed: true,
         roadName: 'Av. Paulista',
+        tollFee: 4.20,
       );
 
       final map = record.toMap();
@@ -25,21 +26,25 @@ void main() {
       expect(map['speed_limit'], equals(60));
       expect(map['is_over_speed'], equals(1));
       expect(map['road_name'], equals('Av. Paulista'));
+      expect(map['toll_fee'], equals(4.20));
 
       final reconstructed = PassageRecord.fromMap(map);
       expect(reconstructed, equals(record));
       expect(reconstructed.props, equals(record.props));
+      expect(reconstructed.tollFee, equals(4.20));
     });
 
     test('StatsSummary props e cálculo de taxa quando total é zero', () {
       const summaryEmpty = StatsSummary(totalPassages: 0, overSpeedPassages: 0);
       expect(summaryEmpty.adherenceRatePercent, equals(100.0));
       expect(summaryEmpty.compliantPassages, equals(0));
-      expect(summaryEmpty.props, equals([0, 0]));
+      expect(summaryEmpty.totalTollCost, equals(0.0));
+      expect(summaryEmpty.props, equals([0, 0, 0.0]));
 
-      const summaryPartial = StatsSummary(totalPassages: 10, overSpeedPassages: 2);
+      const summaryPartial = StatsSummary(totalPassages: 10, overSpeedPassages: 2, totalTollCost: 12.50);
       expect(summaryPartial.compliantPassages, equals(8));
       expect(summaryPartial.adherenceRatePercent, equals(80.0));
+      expect(summaryPartial.totalTollCost, equals(12.50));
     });
   });
 }

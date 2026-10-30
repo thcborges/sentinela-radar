@@ -11,6 +11,7 @@ class PassageRecord extends Equatable {
   final DateTime timestamp;
   final bool isOverSpeed;
   final String roadName;
+  final double? tollFee;
 
   const PassageRecord({
     this.id,
@@ -21,6 +22,7 @@ class PassageRecord extends Equatable {
     required this.timestamp,
     required this.isOverSpeed,
     this.roadName = '',
+    this.tollFee,
   });
 
   Map<String, dynamic> toMap() {
@@ -33,6 +35,7 @@ class PassageRecord extends Equatable {
       'timestamp': timestamp.toIso8601String(),
       'is_over_speed': isOverSpeed ? 1 : 0,
       'road_name': roadName,
+      if (tollFee != null) 'toll_fee': tollFee,
     };
   }
 
@@ -46,6 +49,7 @@ class PassageRecord extends Equatable {
       timestamp: DateTime.parse(map['timestamp'] as String),
       isOverSpeed: (map['is_over_speed'] as int) == 1,
       roadName: (map['road_name'] as String?) ?? '',
+      tollFee: (map['toll_fee'] as num?)?.toDouble(),
     );
   }
 
@@ -59,17 +63,20 @@ class PassageRecord extends Equatable {
         timestamp,
         isOverSpeed,
         roadName,
+        tollFee,
       ];
 }
 
-/// Resumo analítico das estatísticas locais de conformidade de velocidade.
+/// Resumo analítico das estatísticas locais de conformidade de velocidade e pedágios.
 class StatsSummary extends Equatable {
   final int totalPassages;
   final int overSpeedPassages;
+  final double totalTollCost;
 
   const StatsSummary({
     required this.totalPassages,
     required this.overSpeedPassages,
+    this.totalTollCost = 0.0,
   });
 
   int get compliantPassages => totalPassages - overSpeedPassages;
@@ -80,5 +87,5 @@ class StatsSummary extends Equatable {
   }
 
   @override
-  List<Object?> get props => [totalPassages, overSpeedPassages];
+  List<Object?> get props => [totalPassages, overSpeedPassages, totalTollCost];
 }

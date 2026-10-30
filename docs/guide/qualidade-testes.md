@@ -24,20 +24,21 @@ A estabilidade e precisão do **Sentinela** são garantidas por uma política in
 | `core/platform/` (`LiveActivityService`, Dynamic Island Adapter) | 62 / 66 | **93.9%** | ✅ Aprovado |
 | `core/backup/` (`BackupRestoreService` 100% Offline) | 48 / 48 | **100.0%** | ✅ Aprovado |
 | `core/diagnostics/` (`SystemDiagnosticsService`) | 32 / 32 | **100.0%** | ✅ Aprovado |
-| `core/audio/` (`AudioAlertPlayer`, `PlatformTtsEngine`, Formatter) | 57 / 58 | **98.3%** | ✅ Aprovado |
+| `core/audio/` (`AudioAlertPlayer`, `PlatformTtsEngine`, `ToneGenerator`, Formatter) | 83 / 84 | **98.8%** | ✅ Aprovado |
+| `core/toll/` (`TollRateEstimator` e tarifas Free Flow) | 21 / 21 | **100.0%** | ✅ Aprovado |
 | `core/location/` (`GeolocatorLocationService`) | 26 / 27 | **96.3%** | ✅ Aprovado |
 | `core/hardware/` (`PlatformWakelockManager`) | 9 / 9 | **100.0%** | ✅ Aprovado |
 | `core/network/` (`PlatformConnectivityChecker`) | 13 / 13 | **100.0%** | ✅ Aprovado |
 | `core/theme/` & `models/` (Theme, POI Models, Distance Calculator) | 60 / 61 | **98.4%** | ✅ Aprovado |
 | `data/database/` & `repository/` (`DatabaseManager`, `PoiRepository`, `SeedDatabaseLoader`) | 143 / 145 | **98.6%** | ✅ Aprovado |
 | `data/sync/` (`PoiSyncService`, `PoiSyncParser`) | 124 / 132 | **93.9%** | ✅ Aprovado |
-| `features/dashboard/` (Speedometer, Sonar, Banner, DashboardScreen, Cubit) | 385 / 395 | **97.5%** | ✅ Aprovado |
+| `features/dashboard/` (Speedometer, Sonar, Banner, DashboardScreen, HUD Mirror) | 405 / 415 | **97.6%** | ✅ Aprovado |
 | `features/overlay/` (`FloatingOverlayWidget`, `OverlayService`) | 79 / 80 | **98.8%** | ✅ Aprovado |
 | `features/settings/` (`SettingsScreen`) | 176 / 184 | **95.7%** | ✅ Aprovado |
-| `features/stats/` (`PassageRepository`, `StatsCubit`, `StatsScreen`, Models) | 196 / 205 | **95.6%** | ✅ Aprovado |
-| `background/` (`BackgroundTrackingService`) | 67 / 68 | **98.5%** | ✅ Aprovado |
+| `features/stats/` (`PassageRepository`, `StatsCubit`, `StatsScreen`, Models com Tarifas) | 221 / 224 | **98.7%** | ✅ Aprovado |
+| `background/` (`BackgroundTrackingService`) | 70 / 72 | **97.2%** | ✅ Aprovado |
 | `main.dart` & `overlayMain` | 68 / 72 | **94.4%** | ✅ Aprovado |
-| **Total Consolidado** | **1753 / 1812 linhas** | **96.74%** | ✅ Aprovado (209 testes) |
+| **Total Consolidado** | **1848 / 1902 linhas** | **97.16%** | ✅ Aprovado (226 testes) |
 
 ---
 

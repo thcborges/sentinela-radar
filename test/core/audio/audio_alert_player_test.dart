@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:sentinela/core/audio/audio_alert_player.dart';
+import 'package:sentinela/core/audio/tone_generator.dart';
 import 'package:sentinela/core/audio/tts_engine_interface.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
 import 'package:sentinela/core/models/poi_model.dart';
@@ -9,12 +10,14 @@ class MockTtsEngine extends Mock implements TtsEngineInterface {}
 
 void main() {
   late MockTtsEngine mockTts;
+  late FakeToneGenerator fakeTone;
   late AudioAlertPlayer player;
 
   setUp(() {
     mockTts = MockTtsEngine();
+    fakeTone = FakeToneGenerator();
     when(() => mockTts.speak(any())).thenAnswer((_) async => true);
-    player = AudioAlertPlayer(ttsEngine: mockTts);
+    player = AudioAlertPlayer(ttsEngine: mockTts, toneGenerator: fakeTone);
   });
 
   tearDown(() {
@@ -22,6 +25,11 @@ void main() {
   });
 
   group('AudioAlertPlayer (Gerenciador de Voz e Bipes Sonar)', () {
+    test('deve expor os motores tts e tone generator corretamente', () {
+      expect(player.ttsEngine, equals(mockTts));
+      expect(player.toneGenerator, equals(fakeTone));
+    });
+
     test('deve anunciar alerta via TTS quando novo alerta ativo chegar e voz estiver habilitada', () async {
       const poi = PoiPoint(
         id: 10,
@@ -146,6 +154,46 @@ void main() {
       );
 
       verify(() => mockTts.speak(any())).called(1);
+    });
+
+    test('deve emitir bipes com frequencia 880Hz em alerta normal e 1200Hz em excesso de velocidade', () async {
+      const normalAlert = ActiveAlert(
+        poi: PoiPoint(id: 40, latitude: 0, longitude: 0, type: PoiType.fixedRadar, speedLimit: 60),
+        distanceMeters: 500,
+        currentSpeedKmh: 55,
+        status: AlertStatus.alerting,
+        isOverSpeed: false,
+        targetBearing: 0,
+        relativeBearing: 0,
+      );
+
+      await player.playAlert(normalAlert, isVoiceEnabled: false, isBeepEnabled: true);
+      expect(fakeTone.playedTones.length, equals(1));
+      expect(fakeTone.playedTones.first['frequencyHz'], equals(880.0));
+      expect(fakeTone.playedTones.first['durationMs'], equals(80));
+
+      // Segundo bipe imediato deve respeitar a cadência calculada (não emite novo bipe imediato)
+      await player.playAlert(normalAlert, isVoiceEnabled: false, isBeepEnabled: true);
+      expect(fakeTone.playedTones.length, equals(1));
+
+      // Reset limpa o timer e para o tone generator
+      player.reset();
+      expect(fakeTone.isPlaying, isFalse);
+
+      const overSpeedAlert = ActiveAlert(
+        poi: PoiPoint(id: 41, latitude: 0, longitude: 0, type: PoiType.fixedRadar, speedLimit: 60),
+        distanceMeters: 100,
+        currentSpeedKmh: 80,
+        status: AlertStatus.overSpeed,
+        isOverSpeed: true,
+        targetBearing: 0,
+        relativeBearing: 0,
+      );
+
+      await player.playAlert(overSpeedAlert, isVoiceEnabled: false, isBeepEnabled: true);
+      expect(fakeTone.playedTones.length, equals(2));
+      expect(fakeTone.playedTones.last['frequencyHz'], equals(1200.0));
+      expect(fakeTone.playedTones.last['durationMs'], equals(120));
     });
   });
 }
