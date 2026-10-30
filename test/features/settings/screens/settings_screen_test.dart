@@ -6,10 +6,12 @@ import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/core/theme/sentinela_theme.dart';
 import 'package:sentinela/data/sync/poi_sync_service.dart';
 import 'package:sentinela/features/dashboard/bloc/dashboard_cubit.dart';
+import 'package:sentinela/features/overlay/services/overlay_service.dart';
 import 'package:sentinela/features/settings/screens/settings_screen.dart';
 
 class MockPoiSyncService extends Mock implements PoiSyncService {}
 class MockDashboardCubit extends Mock implements DashboardCubit {}
+class MockOverlayService extends Mock implements OverlayService {}
 
 void main() {
   late MockPoiSyncService mockSyncService;
@@ -122,7 +124,27 @@ void main() {
       await tester.tap(radarSwitch);
       await tester.pump();
 
-      verify(() => mockDashboardCubit.togglePoiType(any(), false)).called(2);
+      await tester.scrollUntilVisible(find.widgetWithText(SwitchListTile, 'Semáforos e Câmeras'), 200);
+      final tlSwitch = find.widgetWithText(SwitchListTile, 'Semáforos e Câmeras');
+      await tester.tap(tlSwitch);
+      await tester.pump();
+
+      await tester.scrollUntilVisible(find.widgetWithText(SwitchListTile, 'Lombadas e Quebra-Molas'), 200);
+      final bumpSwitch = find.widgetWithText(SwitchListTile, 'Lombadas e Quebra-Molas');
+      await tester.tap(bumpSwitch);
+      await tester.pump();
+
+      await tester.scrollUntilVisible(find.widgetWithText(SwitchListTile, 'Praças de Pedágio'), 200);
+      final tollSwitch = find.widgetWithText(SwitchListTile, 'Praças de Pedágio');
+      await tester.tap(tollSwitch);
+      await tester.pump();
+
+      await tester.scrollUntilVisible(find.widgetWithText(SwitchListTile, 'Polícia Rodoviária'), 200);
+      final patrolSwitch = find.widgetWithText(SwitchListTile, 'Polícia Rodoviária');
+      await tester.tap(patrolSwitch);
+      await tester.pump();
+
+      verify(() => mockDashboardCubit.togglePoiType(any(), false)).called(9);
 
       await tester.scrollUntilVisible(find.widgetWithText(SwitchListTile, 'Avisos por Voz (TTS Offline)'), 300);
       final voiceSwitch = find.widgetWithText(SwitchListTile, 'Avisos por Voz (TTS Offline)');
@@ -153,6 +175,30 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.text('Erro na conexão HTTP 500'), findsOneWidget);
+    });
+    testWidgets('deve acionar OverlayService ao alternar switch de Janela Flutuante', (tester) async {
+      final mockOverlay = MockOverlayService();
+      when(() => mockOverlay.isOverlayOpen).thenReturn(false);
+      when(() => mockOverlay.startOverlay()).thenAnswer((_) async => true);
+      when(() => mockOverlay.stopOverlay()).thenAnswer((_) async => true);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: SettingsScreen(
+            syncService: mockSyncService,
+            overlayService: mockOverlay,
+          ),
+        ),
+      );
+
+      await tester.scrollUntilVisible(find.text('Janela Flutuante (Overlay)'), 300);
+      expect(find.text('Janela Flutuante (Overlay)'), findsOneWidget);
+
+      await tester.tap(find.text('Janela Flutuante (Overlay)'));
+      await tester.pump();
+
+      verify(() => mockOverlay.startOverlay()).called(1);
     });
   });
 }

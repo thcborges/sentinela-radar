@@ -146,11 +146,9 @@ void main() {
     });
 
     testWidgets('deve renderizar layout landscape quando a orientação da tela for horizontal', (tester) async {
-      tester.view.physicalSize = const Size(1920, 1080);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
+      await tester.binding.setSurfaceSize(const Size(800, 400));
+      addTearDown(() async {
+        await tester.binding.setSurfaceSize(null);
       });
 
       await tester.pumpWidget(
