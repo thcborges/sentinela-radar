@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
+import 'package:sentinela/core/hardware/wakelock_manager.dart';
+import 'package:sentinela/core/location/location_service_interface.dart';
 import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/core/theme/sentinela_theme.dart';
 import 'package:sentinela/data/repository/poi_repository.dart';
@@ -16,6 +19,8 @@ class MockPoiRepository extends Mock implements PoiRepository {}
 class MockAlertMachine extends Mock implements AlertMachine {}
 class MockPoiSyncService extends Mock implements PoiSyncService {}
 class MockStatsCubit extends MockCubit<StatsState> implements StatsCubit {}
+class MockWakelockManager extends Mock implements WakelockManager {}
+class MockLocationService extends Mock implements LocationService {}
 
 void main() {
   late MockPoiRepository mockRepo;
@@ -196,6 +201,76 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Estatísticas de Condução'), findsOneWidget);
+    });
+
+    testWidgets('deve habilitar Wakelock no initState e desabilitar no dispose', (tester) async {
+      final mockWakelock = MockWakelockManager();
+      when(() => mockWakelock.enable()).thenAnswer((_) async {});
+      when(() => mockWakelock.disable()).thenAnswer((_) async {});
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: BlocProvider<DashboardCubit>.value(
+            value: dashboardCubit,
+            child: DashboardScreen(
+              syncService: mockSyncService,
+              wakelockManager: mockWakelock,
+            ),
+          ),
+        ),
+      );
+
+      verify(() => mockWakelock.enable()).called(1);
+
+      // Desmonta widget para acionar dispose
+      await tester.pumpWidget(const SizedBox.shrink());
+      verify(() => mockWakelock.disable()).called(1);
+    });
+
+    testWidgets('deve assinar stream do LocationService e atualizar DashboardCubit', (tester) async {
+      when(() => mockRepo.findNearbyPois(
+            latitude: any(named: 'latitude'),
+            longitude: any(named: 'longitude'),
+            radiusMeters: any(named: 'radiusMeters'),
+          )).thenAnswer((_) async => []);
+
+      final mockLocation = MockLocationService();
+      final streamController = StreamController<VehiclePosition>.broadcast();
+      when(() => mockLocation.getPositionStream(
+            distanceFilterMeters: any(named: 'distanceFilterMeters'),
+            intervalMs: any(named: 'intervalMs'),
+          )).thenAnswer((_) => streamController.stream);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: BlocProvider<DashboardCubit>.value(
+            value: dashboardCubit,
+            child: DashboardScreen(
+              syncService: mockSyncService,
+              locationService: mockLocation,
+            ),
+          ),
+        ),
+      );
+
+      final pos = VehiclePosition(
+        latitude: -23.5505,
+        longitude: -46.6333,
+        speedKmh: 80.0,
+        bearing: 90.0,
+        accuracyMeters: 4.0,
+        timestamp: DateTime(2026, 10, 30, 10, 0),
+      );
+
+      streamController.add(pos);
+      await tester.pump();
+
+      expect(dashboardCubit.state.currentSpeedKmh, equals(80.0));
+      expect(dashboardCubit.state.currentBearing, equals(90.0));
+
+      await streamController.close();
     });
   });
 }

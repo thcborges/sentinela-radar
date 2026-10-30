@@ -21,14 +21,17 @@ A estabilidade e precisão do **Sentinela** são garantidas por uma política in
 | :--- | :---: | :---: | :---: |
 | `core/geo/` (Haversine, Bearing, Bounding Box) | 61 / 63 | **96.8%** | ✅ Aprovado |
 | `core/engine/` (`AlertMachine`) | 91 / 94 | **96.8%** | ✅ Aprovado |
-| `core/audio/` (`AudioAlertPlayer`, TTS) | 40 / 41 | **97.5%** | ✅ Aprovado |
+| `core/audio/` (`AudioAlertPlayer`, `PlatformTtsEngine`) | 62 / 65 | **95.4%** | ✅ Aprovado |
+| `core/location/` (`GeolocatorLocationService`) | 32 / 34 | **94.1%** | ✅ Aprovado |
+| `core/hardware/` (`PlatformWakelockManager`) | 18 / 18 | **100.0%** | ✅ Aprovado |
+| `core/network/` (`PlatformConnectivityChecker`) | 19 / 20 | **95.0%** | ✅ Aprovado |
 | `data/database/` & `repository/` | 130 / 132 | **98.4%** | ✅ Aprovado |
-| `data/sync/` (`PoiSyncService`, Parser) | 121 / 128 | **94.5%** | ✅ Aprovado |
-| `features/dashboard/` (Speedometer, Sonar, Banner) | 209 / 239 | **92.4%** | ✅ Aprovado |
+| `data/sync/` (`PoiSyncService`, Parser) | 135 / 142 | **95.1%** | ✅ Aprovado |
+| `features/dashboard/` (Speedometer, Sonar, Banner) | 225 / 248 | **90.7%** | ✅ Aprovado |
 | `features/overlay/` (`FloatingOverlayWidget`, Service) | 79 / 80 | **98.7%** | ✅ Aprovado |
 | `features/stats/` (`PassageRepository`, `StatsCubit`) | 148 / 150 | **98.6%** | ✅ Aprovado |
 | `background/` (`BackgroundTrackingService`) | 43 / 43 | **100.0%** | ✅ Aprovado |
-| **Total do Projeto** | **> 1100 linhas** | **> 94%** | ✅ Aprovado |
+| **Total Consolidado** | **1375 / 1445 linhas** | **95.16%** | ✅ Aprovado (159 testes) |
 
 ---
 
