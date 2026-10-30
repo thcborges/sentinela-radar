@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sentinela/core/backup/backup_restore_service.dart';
 import 'package:sentinela/core/diagnostics/system_diagnostics.dart';
 import 'package:sentinela/core/hardware/wakelock_manager.dart';
 import 'package:sentinela/core/location/location_service_interface.dart';
@@ -24,6 +25,7 @@ class DashboardScreen extends StatefulWidget {
   final LocationService? locationService;
   final OverlayService? overlayService;
   final SystemDiagnosticsService? diagnosticsService;
+  final BackupRestoreService? backupService;
 
   const DashboardScreen({
     super.key,
@@ -33,6 +35,7 @@ class DashboardScreen extends StatefulWidget {
     this.locationService,
     this.overlayService,
     this.diagnosticsService,
+    this.backupService,
   });
 
   @override
@@ -111,6 +114,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     dashboardCubit: cubit,
                     wakelockManager: widget.wakelockManager,
                     overlayService: widget.overlayService,
+                    backupService: widget.backupService,
+                    initialPreferences: cubit.alertMachine.preferences,
                     initialStats: {
                       'radares': cubit.state.totalPoisCount,
                     },

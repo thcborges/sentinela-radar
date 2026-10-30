@@ -107,5 +107,45 @@ void main() {
       player.reset();
       expect(player.lastAlertPoiId, isNull);
     });
+
+    test('não deve falar se alertOnlyIfOverSpeed for verdadeiro e isOverSpeed for falso', () async {
+      const normalAlert = ActiveAlert(
+        poi: PoiPoint(id: 30, latitude: 0, longitude: 0, type: PoiType.fixedRadar, speedLimit: 60),
+        distanceMeters: 200,
+        currentSpeedKmh: 55,
+        status: AlertStatus.alerting,
+        isOverSpeed: false,
+        targetBearing: 0,
+        relativeBearing: 0,
+      );
+
+      await player.playAlert(
+        normalAlert,
+        isVoiceEnabled: true,
+        isBeepEnabled: false,
+        alertOnlyIfOverSpeed: true,
+      );
+
+      verifyNever(() => mockTts.speak(any()));
+
+      const overSpeedAlert = ActiveAlert(
+        poi: PoiPoint(id: 31, latitude: 0, longitude: 0, type: PoiType.fixedRadar, speedLimit: 60),
+        distanceMeters: 200,
+        currentSpeedKmh: 75,
+        status: AlertStatus.overSpeed,
+        isOverSpeed: true,
+        targetBearing: 0,
+        relativeBearing: 0,
+      );
+
+      await player.playAlert(
+        overSpeedAlert,
+        isVoiceEnabled: true,
+        isBeepEnabled: false,
+        alertOnlyIfOverSpeed: true,
+      );
+
+      verify(() => mockTts.speak(any())).called(1);
+    });
   });
 }
