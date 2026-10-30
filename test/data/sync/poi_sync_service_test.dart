@@ -1,12 +1,14 @@
 import 'package:http/http.dart' as http;
 import 'package:mocktail/mocktail.dart';
 import 'package:sentinela/core/models/poi_model.dart';
+import 'package:sentinela/core/network/connectivity_checker.dart';
 import 'package:sentinela/data/database/database_manager.dart';
 import 'package:sentinela/data/sync/poi_sync_service.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:test/test.dart';
 
 class MockHttpClient extends Mock implements http.Client {}
+class MockConnectivityChecker extends Mock implements NetworkConnectivityChecker {}
 
 void main() {
   setUpAll(() {
@@ -162,6 +164,49 @@ void main() {
     test('deve tratar JSON corrompido em syncFromJson retornando false e emitindo erro', () async {
       final success = await syncService.syncFromJson('{"corrompido:');
       expect(success, isFalse);
+    });
+
+    test('deve bloquear sincronização se requireWifi for true e dispositivo não estiver em Wi-Fi', () async {
+      final mockConn = MockConnectivityChecker();
+      when(() => mockConn.isWifiConnected()).thenAnswer((_) async => false);
+
+      final wifiSyncService = PoiSyncService(
+        db,
+        httpClient: mockClient,
+        connectivityChecker: mockConn,
+      );
+
+      final progressEvents = <SyncProgress>[];
+      final sub = wifiSyncService.progressStream.listen(progressEvents.add);
+
+      final success = await wifiSyncService.syncFromRemote(requireWifi: true);
+      await Future<void>.delayed(Duration.zero);
+      expect(success, isFalse);
+      expect(progressEvents.any((p) => p.status == SyncStatus.error && p.message.contains('Wi-Fi')), isTrue);
+
+      await sub.cancel();
+      wifiSyncService.dispose();
+    });
+
+    test('deve permitir sincronização se requireWifi for true e dispositivo estiver em Wi-Fi', () async {
+      final mockConn = MockConnectivityChecker();
+      when(() => mockConn.isWifiConnected()).thenAnswer((_) async => true);
+      when(() => mockClient.post(
+            any(),
+            body: any(named: 'body'),
+            headers: any(named: 'headers'),
+          )).thenAnswer((_) async => http.Response(validOverpassJson, 200));
+
+      final wifiSyncService = PoiSyncService(
+        db,
+        httpClient: mockClient,
+        connectivityChecker: mockConn,
+      );
+
+      final success = await wifiSyncService.syncFromRemote(requireWifi: true);
+      expect(success, isTrue);
+
+      wifiSyncService.dispose();
     });
 
     test('construtor padrão sem httpClient deve criar e descartar client próprio com sucesso', () {

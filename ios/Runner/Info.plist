@@ -47,6 +47,16 @@
 			</array>
 		</dict>
 	</dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>O Sentinela precisa da sua localização para detectar radares, semáforos e lombadas à frente durante a condução.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>O Sentinela monitora radares em segundo plano mesmo quando você utiliza outros aplicativos de navegação ou com a tela bloqueada.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>audio</string>
+		<string>processing</string>
+	</array>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

@@ -3,6 +3,7 @@ import 'package:equatable/equatable.dart';
 import 'package:http/http.dart' as http;
 import 'package:sqlite3/sqlite3.dart';
 import '../../core/models/poi_model.dart';
+import '../../core/network/connectivity_checker.dart';
 import 'poi_sync_parser.dart';
 
 /// Ciclo de vida e status da rotina de sincronização de dados abertos.
@@ -40,6 +41,7 @@ class PoiSyncService {
   final http.Client _client;
   final String overpassUrl;
   final bool _ownsClient;
+  final NetworkConnectivityChecker? _connectivityChecker;
 
   final StreamController<SyncProgress> _progressController =
       StreamController<SyncProgress>.broadcast();
@@ -48,8 +50,10 @@ class PoiSyncService {
     this.db, {
     http.Client? httpClient,
     this.overpassUrl = 'https://overpass-api.de/api/interpreter',
+    NetworkConnectivityChecker? connectivityChecker,
   })  : _client = httpClient ?? http.Client(),
-        _ownsClient = httpClient == null;
+        _ownsClient = httpClient == null,
+        _connectivityChecker = connectivityChecker;
 
   /// Stream reativo para acompanhamento na tela de Configurações em tempo real.
   Stream<SyncProgress> get progressStream => _progressController.stream;
@@ -63,10 +67,25 @@ class PoiSyncService {
   }
 
   /// Dispara a sincronização in-app sob demanda.
-  Future<bool> startInAppUpdate() => syncFromRemote();
+  Future<bool> startInAppUpdate({bool requireWifi = false}) =>
+      syncFromRemote(requireWifi: requireWifi);
 
   /// Dispara a sincronização conectando ao endpoint Overpass API via rede.
-  Future<bool> syncFromRemote({String? customQuery}) async {
+  Future<bool> syncFromRemote({
+    bool requireWifi = false,
+    String? customQuery,
+  }) async {
+    if (requireWifi && _connectivityChecker != null) {
+      final isWifi = await _connectivityChecker.isWifiConnected();
+      if (!isWifi) {
+        _progressController.add(const SyncProgress(
+          status: SyncStatus.error,
+          message: 'Sincronização configurada para Wi-Fi. Conecte-se a uma rede Wi-Fi para atualizar.',
+        ));
+        return false;
+      }
+    }
+
     _progressController.add(const SyncProgress(
       status: SyncStatus.downloading,
       message: 'Conectando e baixando dados abertos do Brasil...',

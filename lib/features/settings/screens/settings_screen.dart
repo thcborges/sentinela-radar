@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:sentinela/core/hardware/wakelock_manager.dart';
 import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/core/theme/sentinela_theme.dart';
 import 'package:sentinela/data/sync/poi_sync_service.dart';
@@ -13,6 +14,7 @@ class SettingsScreen extends StatefulWidget {
   final String lastUpdatedText;
   final DashboardCubit? dashboardCubit;
   final OverlayService? overlayService;
+  final WakelockManager? wakelockManager;
 
   const SettingsScreen({
     super.key,
@@ -21,6 +23,7 @@ class SettingsScreen extends StatefulWidget {
     this.lastUpdatedText = 'Base instalada e pronta para uso',
     this.dashboardCubit,
     this.overlayService,
+    this.wakelockManager,
   });
 
   @override
@@ -43,8 +46,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _audioVoiceTts = true;
   bool _audioBeeps = true;
 
-  // Janela Flutuante (Overlay)
+  // Janela Flutuante (Overlay) & Hardware
   bool _overlayActive = false;
+  bool _onlyWifiSync = true;
+  bool _keepScreenAwake = true;
 
   @override
   void initState() {
@@ -70,7 +75,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _triggerUpdate() {
-    widget.syncService.startInAppUpdate();
+    widget.syncService.startInAppUpdate(requireWifi: _onlyWifiSync);
   }
 
   @override
@@ -167,6 +172,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ),
                       ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Apenas sincronizar via Wi-Fi'),
+                      subtitle: const Text('Evita consumo do pacote de dados móveis'),
+                      value: _onlyWifiSync,
+                      onChanged: isSyncing ? null : (val) => setState(() => _onlyWifiSync = val),
+                    ),
+                    const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
                       height: 48,
@@ -325,18 +338,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           Card(
             color: SentinelaTheme.surfaceContainerDark,
-            child: SwitchListTile(
-              title: const Text('Janela Flutuante (Overlay)'),
-              subtitle: const Text('Sobrepor velocímetro e alertas a outros apps (Waze/Maps)'),
-              value: _overlayActive,
-              onChanged: (val) async {
-                setState(() => _overlayActive = val);
-                if (val) {
-                  await widget.overlayService?.startOverlay();
-                } else {
-                  await widget.overlayService?.stopOverlay();
-                }
-              },
+            child: Column(
+              children: [
+                SwitchListTile(
+                  title: const Text('Janela Flutuante (Overlay)'),
+                  subtitle: const Text('Sobrepor velocímetro e alertas a outros apps (Waze/Maps)'),
+                  value: _overlayActive,
+                  onChanged: (val) async {
+                    setState(() => _overlayActive = val);
+                    if (val) {
+                      await widget.overlayService?.startOverlay();
+                    } else {
+                      await widget.overlayService?.stopOverlay();
+                    }
+                  },
+                ),
+                const Divider(height: 1, color: Color(0xFF262626)),
+                SwitchListTile(
+                  title: const Text('Manter Tela Ativa (Wakelock)'),
+                  subtitle: const Text('Impede desligamento automático da tela no painel'),
+                  value: _keepScreenAwake,
+                  onChanged: (val) async {
+                    setState(() => _keepScreenAwake = val);
+                    if (val) {
+                      await widget.wakelockManager?.enable();
+                    } else {
+                      await widget.wakelockManager?.disable();
+                    }
+                  },
+                ),
+              ],
             ),
           ),
         ],
