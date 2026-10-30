@@ -378,5 +378,31 @@ void main() {
       expect(find.byKey(const Key('dashboard_sonar')), findsOneWidget);
       expect(find.byKey(const Key('dashboard_alert_banner')), findsOneWidget);
     });
+
+    testWidgets('deve alternar modo espelho HUD ao tocar no botao de espelhamento na AppBar', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: BlocProvider<DashboardCubit>.value(
+            value: dashboardCubit,
+            child: DashboardScreen(syncService: mockSyncService),
+          ),
+        ),
+      );
+
+      final hudButton = find.byKey(const Key('dashboard_hud_mirror_button'));
+      expect(hudButton, findsOneWidget);
+      expect(dashboardCubit.state.isHudMirrorMode, isFalse);
+
+      await tester.tap(hudButton);
+      await tester.pump();
+
+      expect(dashboardCubit.state.isHudMirrorMode, isTrue);
+
+      await tester.tap(hudButton);
+      await tester.pump();
+
+      expect(dashboardCubit.state.isHudMirrorMode, isFalse);
+    });
   });
 }

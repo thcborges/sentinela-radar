@@ -1,5 +1,6 @@
 import 'dart:async';
 import '../engine/alert_machine.dart';
+import 'tone_generator.dart';
 import 'tts_alert_formatter.dart';
 import 'tts_engine_interface.dart';
 
@@ -7,13 +8,21 @@ import 'tts_engine_interface.dart';
 /// síntese de voz TTS offline e cálculo de cadência proporcional de bipes de proximidade.
 class AudioAlertPlayer {
   final TtsEngineInterface? _ttsEngine;
+  final ToneGeneratorInterface? _toneGenerator;
 
   int? _lastSpokenPoiId;
   DateTime? _lastSpokenTimestamp;
+  DateTime? _lastBeepTimestamp;
 
-  AudioAlertPlayer({TtsEngineInterface? ttsEngine}) : _ttsEngine = ttsEngine;
+  AudioAlertPlayer({
+    TtsEngineInterface? ttsEngine,
+    ToneGeneratorInterface? toneGenerator,
+  })  : _ttsEngine = ttsEngine,
+        _toneGenerator = toneGenerator;
 
   int? get lastAlertPoiId => _lastSpokenPoiId;
+  ToneGeneratorInterface? get toneGenerator => _toneGenerator;
+  TtsEngineInterface? get ttsEngine => _ttsEngine;
 
   /// Processa e reproduz áudio adequado para o alerta ativo.
   Future<void> playAlert(
@@ -22,12 +31,14 @@ class AudioAlertPlayer {
     required bool isBeepEnabled,
     bool alertOnlyIfOverSpeed = false,
   }) async {
+    if (alertOnlyIfOverSpeed && !alert.isOverSpeed) {
+      return;
+    }
+
+    final now = DateTime.now();
+
     // 1. Fala via TTS com debounce por POI (não repete o mesmo ponto em menos de 10s)
     if (isVoiceEnabled && _ttsEngine != null) {
-      if (alertOnlyIfOverSpeed && !alert.isOverSpeed) {
-        return;
-      }
-      final now = DateTime.now();
       final isNewPoi = _lastSpokenPoiId != alert.poi.id;
       final isDebounceExpired = _lastSpokenTimestamp == null ||
           now.difference(_lastSpokenTimestamp!).inSeconds >= 10;
@@ -37,6 +48,23 @@ class AudioAlertPlayer {
         _lastSpokenTimestamp = now;
         final message = TtsAlertFormatter.formatSpokenAlert(alert);
         await _ttsEngine.speak(message);
+      }
+    }
+
+    // 2. Emite bipe tonal proporcional à proximidade (efeito Sonar)
+    if (isBeepEnabled && _toneGenerator != null) {
+      final intervalMs = calculateBeepIntervalMs(alert.distanceMeters);
+      final isBeepDue = _lastBeepTimestamp == null ||
+          now.difference(_lastBeepTimestamp!).inMilliseconds >= intervalMs;
+
+      if (isBeepDue) {
+        _lastBeepTimestamp = now;
+        final frequency = alert.isOverSpeed ? 1200.0 : 880.0;
+        final duration = alert.isOverSpeed ? 120 : 80;
+        await _toneGenerator.playTone(
+          frequencyHz: frequency,
+          durationMs: duration,
+        );
       }
     }
   }
@@ -55,9 +83,12 @@ class AudioAlertPlayer {
   void reset() {
     _lastSpokenPoiId = null;
     _lastSpokenTimestamp = null;
+    _lastBeepTimestamp = null;
+    _toneGenerator?.stop();
   }
 
   void dispose() {
+    _toneGenerator?.stop();
     _ttsEngine?.dispose();
   }
 }

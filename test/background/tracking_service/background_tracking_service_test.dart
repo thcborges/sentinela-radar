@@ -346,6 +346,87 @@ void main() {
       await gpsController.close();
     });
 
+    test('deve registrar tollFee ao passar por portal Free Flow ou praça de pedágio', () async {
+      final mockPassageRepo = MockPassageRepository();
+      when(() => mockPassageRepo.insertPassage(any())).thenAnswer((_) async => 1);
+
+      final service = BackgroundTrackingService(
+        repository: mockRepository,
+        alertMachine: mockAlertMachine,
+        audioPlayer: mockAudioPlayer,
+        overlayService: mockOverlayService,
+        passageRepository: mockPassageRepo,
+      );
+
+      final gpsController = StreamController<VehiclePosition>();
+
+      const freeFlowPoi = PoiPoint(
+        id: 999,
+        latitude: -23.1,
+        longitude: -46.2,
+        type: PoiType.freeFlowToll,
+        roadName: 'SP-099 Free Flow',
+      );
+
+      const alert = ActiveAlert(
+        poi: freeFlowPoi,
+        distanceMeters: 50,
+        currentSpeedKmh: 90,
+        status: AlertStatus.alerting,
+        isOverSpeed: false,
+        targetBearing: 0,
+        relativeBearing: 0,
+      );
+
+      when(() => mockRepository.findNearbyPois(
+            latitude: any(named: 'latitude'),
+            longitude: any(named: 'longitude'),
+            radiusMeters: any(named: 'radiusMeters'),
+          )).thenAnswer((_) async => [freeFlowPoi]);
+
+      when(() => mockAlertMachine.updatePosition(any(), any())).thenReturn(null);
+
+      // Alerta ativo
+      when(() => mockAlertMachine.state).thenReturn(
+        const AlertState(status: AlertStatus.alerting, activeAlert: alert),
+      );
+
+      await service.startTracking(gpsController.stream);
+
+      gpsController.add(VehiclePosition(
+        latitude: -23.1,
+        longitude: -46.2,
+        speedKmh: 90,
+        bearing: 0,
+        accuracyMeters: 5,
+        timestamp: DateTime(2026, 10, 30, 10, 0),
+      ));
+      await pumpEventQueue();
+
+      // Passou do ponto
+      when(() => mockAlertMachine.state).thenReturn(
+        const AlertState(status: AlertStatus.passed, activeAlert: null),
+      );
+
+      gpsController.add(VehiclePosition(
+        latitude: -23.101,
+        longitude: -46.2,
+        speedKmh: 90,
+        bearing: 0,
+        accuracyMeters: 5,
+        timestamp: DateTime(2026, 10, 30, 10, 0, 5),
+      ));
+      await pumpEventQueue();
+
+      verify(() => mockPassageRepo.insertPassage(any(that: isA<PassageRecord>()
+          .having((p) => p.poiId, 'poiId', 999)
+          .having((p) => p.poiType, 'poiType', PoiType.freeFlowToll)
+          .having((p) => p.tollFee, 'tollFee', 4.20)))).called(1);
+
+      await service.dispose();
+      await gpsController.close();
+    });
+
     test('deve atualizar AdaptiveGpsSampler e redefinir ao parar tracking', () async {
       when(() => mockAlertMachine.state).thenReturn(const AlertState(status: AlertStatus.idle));
       final sampler = AdaptiveGpsSampler(stationaryThreshold: const Duration(seconds: 10));
