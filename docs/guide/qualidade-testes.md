@@ -20,7 +20,9 @@ A estabilidade e precisão do **Sentinela** são garantidas por uma política in
 | Módulo / Pacote | Linhas Cobertas | Cobertura (%) | Status |
 | :--- | :---: | :---: | :---: |
 | `core/geo/` (Haversine, Bearing, Bounding Box) | 61 / 63 | **96.8%** | ✅ Aprovado |
-| `core/engine/` (`AlertMachine`, `AdaptiveGpsSampler`, `AlertPreferences`) | 147 / 154 | **95.5%** | ✅ Aprovado |
+| `core/engine/` (`AlertMachine`, `SectionControlMachine`, `AdaptiveGpsSampler`, Preferences) | 242 / 255 | **94.9%** | ✅ Aprovado |
+| `core/security/` (`DatabaseIntegrityValidator` SHA-256 e PRAGMA) | 29 / 31 | **93.5%** | ✅ Aprovado |
+| `core/export/` (`RouteExporter` GPX 1.1 e KML 2.2 Offline) | 97 / 97 | **100.0%** | ✅ Aprovado |
 | `core/platform/` (`LiveActivityService`, Dynamic Island Adapter) | 62 / 66 | **93.9%** | ✅ Aprovado |
 | `core/backup/` (`BackupRestoreService` 100% Offline) | 48 / 48 | **100.0%** | ✅ Aprovado |
 | `core/diagnostics/` (`SystemDiagnosticsService`) | 32 / 32 | **100.0%** | ✅ Aprovado |
@@ -32,13 +34,13 @@ A estabilidade e precisão do **Sentinela** são garantidas por uma política in
 | `core/theme/` & `models/` (Theme, POI Models, Distance Calculator) | 60 / 61 | **98.4%** | ✅ Aprovado |
 | `data/database/` & `repository/` (`DatabaseManager`, `PoiRepository`, `SeedDatabaseLoader`) | 143 / 145 | **98.6%** | ✅ Aprovado |
 | `data/sync/` (`PoiSyncService`, `PoiSyncParser`) | 124 / 132 | **93.9%** | ✅ Aprovado |
-| `features/dashboard/` (Speedometer, Sonar, Banner, DashboardScreen, HUD Mirror) | 405 / 415 | **97.6%** | ✅ Aprovado |
+| `features/dashboard/` (Speedometer, Sonar, Banner, Section Banner, DashboardScreen) | 447 / 460 | **97.2%** | ✅ Aprovado |
 | `features/overlay/` (`FloatingOverlayWidget`, `OverlayService`) | 79 / 80 | **98.8%** | ✅ Aprovado |
 | `features/settings/` (`SettingsScreen`) | 176 / 184 | **95.7%** | ✅ Aprovado |
-| `features/stats/` (`PassageRepository`, `StatsCubit`, `StatsScreen`, Models com Tarifas) | 221 / 224 | **98.7%** | ✅ Aprovado |
-| `background/` (`BackgroundTrackingService`) | 70 / 72 | **97.2%** | ✅ Aprovado |
+| `features/stats/` (`PassageRepository`, `StatsCubit`, `StatsScreen`, Export GPX/KML) | 262 / 266 | **98.5%** | ✅ Aprovado |
+| `background/` (`BackgroundTrackingService`) | 74 / 77 | **96.1%** | ✅ Aprovado |
 | `main.dart` & `overlayMain` | 68 / 72 | **94.4%** | ✅ Aprovado |
-| **Total Consolidado** | **1848 / 1902 linhas** | **97.16%** | ✅ Aprovado (226 testes) |
+| **Total Consolidado** | **2156 / 2223 linhas** | **96.99%** | ✅ Aprovado (250 testes) |
 
 ---
 

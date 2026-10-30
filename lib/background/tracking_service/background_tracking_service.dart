@@ -2,6 +2,7 @@ import 'dart:async';
 import '../../core/audio/audio_alert_player.dart';
 import '../../core/engine/adaptive_gps_sampler.dart';
 import '../../core/engine/alert_machine.dart';
+import '../../core/engine/section_control_machine.dart';
 import '../../core/models/poi_model.dart';
 import '../../core/platform/live_activity_service.dart';
 import '../../core/toll/toll_rate_estimator.dart';
@@ -24,6 +25,7 @@ class BackgroundTrackingService {
   final AdaptiveGpsSampler? _adaptiveSampler;
   final LiveActivityService? _liveActivityService;
   final TollRateEstimator? _tollEstimator;
+  final SectionControlMachine? _sectionControlMachine;
 
   bool isVoiceEnabled;
   bool isBeepEnabled;
@@ -46,6 +48,7 @@ class BackgroundTrackingService {
     AdaptiveGpsSampler? adaptiveSampler,
     LiveActivityService? liveActivityService,
     TollRateEstimator? tollEstimator,
+    SectionControlMachine? sectionControlMachine,
     this.isVoiceEnabled = true,
     this.isBeepEnabled = true,
     Set<PoiType>? enabledPoiTypes,
@@ -57,6 +60,7 @@ class BackgroundTrackingService {
         _adaptiveSampler = adaptiveSampler,
         _liveActivityService = liveActivityService,
         _tollEstimator = tollEstimator,
+        _sectionControlMachine = sectionControlMachine,
         enabledPoiTypes = enabledPoiTypes ?? Set.from(PoiType.values);
 
   bool get isRunning => _isRunning;
@@ -64,6 +68,7 @@ class BackgroundTrackingService {
   VehiclePosition? get lastPosition => _lastPosition;
   AdaptiveGpsSampler? get adaptiveSampler => _adaptiveSampler;
   TollRateEstimator? get tollEstimator => _tollEstimator;
+  SectionControlMachine? get sectionControlMachine => _sectionControlMachine;
 
   Stream<ActiveAlert?> get alertStream => _alertController.stream;
   Stream<VehiclePosition> get positionStream => _positionController.stream;
@@ -88,6 +93,7 @@ class BackgroundTrackingService {
     _lastPosition = position;
     _positionController.add(position);
     _adaptiveSampler?.updateSpeed(position.speedKmh, timestamp: position.timestamp);
+    _sectionControlMachine?.updatePosition(position);
 
     // 1. Busca POIs no índice espacial SQLite R*Tree (raio de 1200 metros)
     final nearbyPois = await _repository.findNearbyPois(
@@ -129,6 +135,8 @@ class BackgroundTrackingService {
         isOverSpeed: previousAlert.isOverSpeed,
         roadName: previousAlert.poi.roadName,
         tollFee: tollFee,
+        latitude: previousAlert.poi.latitude,
+        longitude: previousAlert.poi.longitude,
       ));
     }
 
@@ -170,6 +178,7 @@ class BackgroundTrackingService {
     _currentAlert = null;
     _lastPosition = null;
     _alertMachine.reset();
+    _sectionControlMachine?.reset();
     _audioPlayer.reset();
     _adaptiveSampler?.reset();
     await _liveActivityService?.stopActivity();
