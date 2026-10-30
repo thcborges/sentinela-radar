@@ -4,6 +4,7 @@ import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/core/theme/sentinela_theme.dart';
 import 'package:sentinela/data/sync/poi_sync_service.dart';
 import 'package:sentinela/features/dashboard/bloc/dashboard_cubit.dart';
+import 'package:sentinela/features/overlay/services/overlay_service.dart';
 
 /// Tela de Configurações, Filtros e Atualização In-App da Base de Dados.
 class SettingsScreen extends StatefulWidget {
@@ -11,6 +12,7 @@ class SettingsScreen extends StatefulWidget {
   final Map<String, int> initialStats;
   final String lastUpdatedText;
   final DashboardCubit? dashboardCubit;
+  final OverlayService? overlayService;
 
   const SettingsScreen({
     super.key,
@@ -18,6 +20,7 @@ class SettingsScreen extends StatefulWidget {
     this.initialStats = const {},
     this.lastUpdatedText = 'Base instalada e pronta para uso',
     this.dashboardCubit,
+    this.overlayService,
   });
 
   @override
@@ -40,10 +43,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _audioVoiceTts = true;
   bool _audioBeeps = true;
 
+  // Janela Flutuante (Overlay)
+  bool _overlayActive = false;
+
   @override
   void initState() {
     super.initState();
     _stats = Map<String, int>.from(widget.initialStats);
+    _overlayActive = widget.overlayService?.isOverlayOpen ?? false;
     _syncSubscription = widget.syncService.progressStream.listen((progress) {
       if (mounted) {
         setState(() {
@@ -298,6 +305,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onChanged: (val) => setState(() => _audioBeeps = val),
                 ),
               ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // 4. Seção Janela Flutuante (Overlay / PiP)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Text(
+              'Modo de Operação',
+              style: TextStyle(
+                color: Color(0xFFB0B0B0),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          Card(
+            color: SentinelaTheme.surfaceContainerDark,
+            child: SwitchListTile(
+              title: const Text('Janela Flutuante (Overlay)'),
+              subtitle: const Text('Sobrepor velocímetro e alertas a outros apps (Waze/Maps)'),
+              value: _overlayActive,
+              onChanged: (val) async {
+                setState(() => _overlayActive = val);
+                if (val) {
+                  await widget.overlayService?.startOverlay();
+                } else {
+                  await widget.overlayService?.stopOverlay();
+                }
+              },
             ),
           ),
         ],
