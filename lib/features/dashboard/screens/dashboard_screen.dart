@@ -1,25 +1,65 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sentinela/core/hardware/wakelock_manager.dart';
+import 'package:sentinela/core/location/location_service_interface.dart';
+import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/core/theme/sentinela_theme.dart';
 import 'package:sentinela/data/sync/poi_sync_service.dart';
 import 'package:sentinela/features/dashboard/bloc/dashboard_cubit.dart';
 import 'package:sentinela/features/dashboard/widgets/alert_banner_m3.dart';
 import 'package:sentinela/features/dashboard/widgets/sonar_radar_m3.dart';
 import 'package:sentinela/features/dashboard/widgets/speedometer_m3.dart';
+import 'package:sentinela/features/overlay/services/overlay_service.dart';
 import 'package:sentinela/features/settings/screens/settings_screen.dart';
 import 'package:sentinela/features/stats/bloc/stats_cubit.dart';
 import 'package:sentinela/features/stats/screens/stats_screen.dart';
 
 /// Tela Principal do Motorista (Dark HUD / Material Design 3)
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   final PoiSyncService syncService;
   final StatsCubit? statsCubit;
+  final WakelockManager? wakelockManager;
+  final LocationService? locationService;
+  final OverlayService? overlayService;
 
   const DashboardScreen({
     super.key,
     required this.syncService,
     this.statsCubit,
+    this.wakelockManager,
+    this.locationService,
+    this.overlayService,
   });
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  StreamSubscription<VehiclePosition>? _locationSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.wakelockManager?.enable();
+    if (widget.locationService != null) {
+      _locationSubscription = widget.locationService!
+          .getPositionStream()
+          .listen((pos) {
+        if (mounted) {
+          context.read<DashboardCubit>().onLocationUpdated(pos);
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _locationSubscription?.cancel();
+    widget.wakelockManager?.disable();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +74,7 @@ class DashboardScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          if (statsCubit != null)
+          if (widget.statsCubit != null)
             IconButton(
               icon: const Icon(Icons.analytics_rounded),
               tooltip: 'Estatísticas',
@@ -42,7 +82,7 @@ class DashboardScreen extends StatelessWidget {
                 Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (context) => BlocProvider.value(
-                      value: statsCubit!,
+                      value: widget.statsCubit!,
                       child: const StatsScreen(),
                     ),
                   ),
@@ -57,8 +97,10 @@ class DashboardScreen extends StatelessWidget {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (context) => SettingsScreen(
-                    syncService: syncService,
+                    syncService: widget.syncService,
                     dashboardCubit: cubit,
+                    wakelockManager: widget.wakelockManager,
+                    overlayService: widget.overlayService,
                     initialStats: {
                       'radares': cubit.state.totalPoisCount,
                     },

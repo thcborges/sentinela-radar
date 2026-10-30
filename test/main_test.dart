@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sentinela/features/overlay/widgets/floating_overlay_widget.dart';
 import 'package:sentinela/main.dart';
 
 void main() {
@@ -11,5 +12,13 @@ void main() {
     expect(materialApp.theme?.useMaterial3, isTrue);
     expect(materialApp.theme?.brightness, equals(Brightness.dark));
     expect(find.text('SENTINELA'), findsOneWidget);
+  });
+
+  testWidgets('overlayMain deve ser executável e instanciar FloatingOverlayWidget', (tester) async {
+    // Testa a execução do entry point nativo
+    overlayMain();
+    await tester.pump();
+
+    expect(find.byType(FloatingOverlayWidget), findsOneWidget);
   });
 }

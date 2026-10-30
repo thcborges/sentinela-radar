@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:sentinela/core/hardware/wakelock_manager.dart';
 import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/core/theme/sentinela_theme.dart';
 import 'package:sentinela/data/sync/poi_sync_service.dart';
@@ -12,6 +13,7 @@ import 'package:sentinela/features/settings/screens/settings_screen.dart';
 class MockPoiSyncService extends Mock implements PoiSyncService {}
 class MockDashboardCubit extends Mock implements DashboardCubit {}
 class MockOverlayService extends Mock implements OverlayService {}
+class MockWakelockManager extends Mock implements WakelockManager {}
 
 void main() {
   late MockPoiSyncService mockSyncService;
@@ -63,7 +65,8 @@ void main() {
     });
 
     testWidgets('deve disparar startInAppUpdate ao tocar no botão de atualização', (tester) async {
-      when(() => mockSyncService.startInAppUpdate()).thenAnswer((_) async => true);
+      when(() => mockSyncService.startInAppUpdate(requireWifi: any(named: 'requireWifi')))
+          .thenAnswer((_) async => true);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -78,7 +81,7 @@ void main() {
       await tester.tap(find.text('ATUALIZAR BASE AGORA (VIA WI-FI)'));
       await tester.pump();
 
-      verify(() => mockSyncService.startInAppUpdate()).called(1);
+      verify(() => mockSyncService.startInAppUpdate(requireWifi: any(named: 'requireWifi'))).called(1);
     });
 
     testWidgets('deve exibir mensagem de progresso durante a sincronização', (tester) async {
@@ -199,6 +202,73 @@ void main() {
       await tester.pump();
 
       verify(() => mockOverlay.startOverlay()).called(1);
+    });
+
+    testWidgets('deve disparar startInAppUpdate com requireWifi respeitando switch de Wi-Fi', (tester) async {
+      when(() => mockSyncService.startInAppUpdate(requireWifi: any(named: 'requireWifi')))
+          .thenAnswer((_) async => true);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: SettingsScreen(
+            syncService: mockSyncService,
+          ),
+        ),
+      );
+
+      expect(find.text('Apenas sincronizar via Wi-Fi'), findsOneWidget);
+
+      final updateBtn = find.text('ATUALIZAR BASE AGORA (VIA WI-FI)');
+      await tester.tap(updateBtn);
+      await tester.pump();
+
+      verify(() => mockSyncService.startInAppUpdate(requireWifi: true)).called(1);
+
+      // Alternar switch de Wi-Fi para false
+      await tester.tap(find.text('Apenas sincronizar via Wi-Fi'));
+      await tester.pump();
+
+      await tester.tap(updateBtn);
+      await tester.pump();
+
+      verify(() => mockSyncService.startInAppUpdate(requireWifi: false)).called(1);
+    });
+
+    testWidgets('deve acionar WakelockManager ao alternar switch de manter tela ativa', (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final mockWakelock = MockWakelockManager();
+      when(() => mockWakelock.enable()).thenAnswer((_) async {});
+      when(() => mockWakelock.disable()).thenAnswer((_) async {});
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: SettingsScreen(
+            syncService: mockSyncService,
+            wakelockManager: mockWakelock,
+          ),
+        ),
+      );
+
+      await tester.scrollUntilVisible(find.text('Manter Tela Ativa (Wakelock)'), 300);
+      expect(find.text('Manter Tela Ativa (Wakelock)'), findsOneWidget);
+
+      // Desativa wakelock
+      await tester.tap(find.text('Manter Tela Ativa (Wakelock)'), warnIfMissed: false);
+      await tester.pump();
+      verify(() => mockWakelock.disable()).called(1);
+
+      // Reativa wakelock
+      await tester.tap(find.text('Manter Tela Ativa (Wakelock)'), warnIfMissed: false);
+      await tester.pump();
+      verify(() => mockWakelock.enable()).called(1);
     });
   });
 }
