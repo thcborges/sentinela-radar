@@ -15,19 +15,26 @@ jobs:
       - name: Checkout do Repositório
         uses: actions/checkout@v4
 
-      - name: Setup Dart SDK
-        uses: dart-lang/setup-dart@v1
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
         with:
-          sdk: stable
+          channel: stable
+          cache: true
 
       - name: Instalar Dependências
-        run: dart pub get
+        run: flutter pub get
 
-      - name: Análise Estática de Código (dart analyze)
-        run: dart analyze --fatal-infos
+      - name: Análise Estática de Código (flutter analyze)
+        run: flutter analyze --fatal-infos
 
-      - name: Executar Suíte de Testes BDD/TDD com Cobertura (>= 90%)
-        run: dart run coverage:test_with_coverage --fail-under 90
+      - name: Executar Suíte de Testes BDD/TDD com Cobertura
+        run: flutter test --coverage
+
+      - name: Validar Barreira de Cobertura (>= 90%)
+        run: |
+          COVERAGE=$(awk -F: '/^DA:/ {split($2,a,","); lines++; if (a[2]>0) hit++} END {if (lines>0) printf "%.2f", (hit/lines)*100; else print "0"}' coverage/lcov.info)
+          echo "Cobertura calculada: $COVERAGE%"
+          awk -v cov="$COVERAGE" 'BEGIN {if (cov >= 90.0) {print "Cobertura OK (>= 90%)"; exit 0} else {print "Cobertura insuficiente (< 90%): " cov "%"; exit 1}}'
 
   security-scan:
     name: Análise de Segurança & Vulnerabilidades (Trivy)
