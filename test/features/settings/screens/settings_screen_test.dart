@@ -1,0 +1,158 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:sentinela/core/models/poi_model.dart';
+import 'package:sentinela/core/theme/sentinela_theme.dart';
+import 'package:sentinela/data/sync/poi_sync_service.dart';
+import 'package:sentinela/features/dashboard/bloc/dashboard_cubit.dart';
+import 'package:sentinela/features/settings/screens/settings_screen.dart';
+
+class MockPoiSyncService extends Mock implements PoiSyncService {}
+class MockDashboardCubit extends Mock implements DashboardCubit {}
+
+void main() {
+  late MockPoiSyncService mockSyncService;
+  late StreamController<SyncProgress> syncStreamController;
+
+  setUpAll(() {
+    registerFallbackValue(PoiType.fixedRadar);
+  });
+
+  setUp(() {
+    mockSyncService = MockPoiSyncService();
+    syncStreamController = StreamController<SyncProgress>.broadcast();
+    when(() => mockSyncService.progressStream)
+        .thenAnswer((_) => syncStreamController.stream);
+  });
+
+  tearDown(() {
+    syncStreamController.close();
+  });
+
+  group('SettingsScreen Widget (Material Design 3)', () {
+    testWidgets('deve renderizar seções de atualização, filtros e áudio', (tester) async {
+      when(() => mockSyncService.startInAppUpdate()).thenAnswer((_) async => true);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: SettingsScreen(
+            syncService: mockSyncService,
+            initialStats: const {
+              'radares': 24810,
+              'semaforos': 7940,
+              'lombadas': 34200,
+              'pedagios': 830,
+            },
+            lastUpdatedText: '29/10/2026 às 15:30',
+          ),
+        ),
+      );
+
+      expect(find.text('Configurações & Dados'), findsOneWidget);
+      expect(find.text('Atualização da Base de POIs'), findsOneWidget);
+      expect(find.text('Filtros de Alerta'), findsOneWidget);
+      expect(find.text('24810'), findsOneWidget);
+      expect(find.text('ATUALIZAR BASE AGORA (VIA WI-FI)'), findsOneWidget);
+
+      await tester.scrollUntilVisible(find.text('Preferências de Áudio'), 200);
+      expect(find.text('Preferências de Áudio'), findsOneWidget);
+    });
+
+    testWidgets('deve disparar startInAppUpdate ao tocar no botão de atualização', (tester) async {
+      when(() => mockSyncService.startInAppUpdate()).thenAnswer((_) async => true);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: SettingsScreen(
+            syncService: mockSyncService,
+            initialStats: const {'radares': 100},
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('ATUALIZAR BASE AGORA (VIA WI-FI)'));
+      await tester.pump();
+
+      verify(() => mockSyncService.startInAppUpdate()).called(1);
+    });
+
+    testWidgets('deve exibir mensagem de progresso durante a sincronização', (tester) async {
+      when(() => mockSyncService.startInAppUpdate()).thenAnswer((_) async => true);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: SettingsScreen(
+            syncService: mockSyncService,
+          ),
+        ),
+      );
+
+      syncStreamController.add(const SyncProgress(
+        status: SyncStatus.downloading,
+        message: 'Baixando dados abertos do Brasil...',
+        progress: 0.35,
+      ));
+
+      await tester.pump();
+
+      expect(find.text('Baixando dados abertos do Brasil...'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    });
+
+    testWidgets('deve alterar switches de filtros e notificar DashboardCubit', (tester) async {
+      final mockDashboardCubit = MockDashboardCubit();
+      when(() => mockSyncService.startInAppUpdate()).thenAnswer((_) async => true);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: SettingsScreen(
+            syncService: mockSyncService,
+            dashboardCubit: mockDashboardCubit,
+          ),
+        ),
+      );
+
+      final radarSwitch = find.widgetWithText(SwitchListTile, 'Radares de Velocidade');
+      expect(radarSwitch, findsOneWidget);
+      await tester.tap(radarSwitch);
+      await tester.pump();
+
+      verify(() => mockDashboardCubit.togglePoiType(any(), false)).called(2);
+
+      await tester.scrollUntilVisible(find.widgetWithText(SwitchListTile, 'Avisos por Voz (TTS Offline)'), 300);
+      final voiceSwitch = find.widgetWithText(SwitchListTile, 'Avisos por Voz (TTS Offline)');
+      await tester.tap(voiceSwitch);
+      await tester.pump();
+
+      final beepSwitch = find.widgetWithText(SwitchListTile, 'Bipes de Proximidade (Sonar)');
+      await tester.tap(beepSwitch);
+      await tester.pump();
+    });
+
+    testWidgets('deve exibir mensagem de erro quando status de sincronização falhar', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: SettingsScreen(
+            syncService: mockSyncService,
+          ),
+        ),
+      );
+
+      syncStreamController.add(const SyncProgress(
+        status: SyncStatus.error,
+        message: 'Erro na conexão HTTP 500',
+        progress: 0.0,
+      ));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('Erro na conexão HTTP 500'), findsOneWidget);
+    });
+  });
+}
