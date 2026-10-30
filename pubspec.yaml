@@ -1,0 +1,16 @@
+name: sentinela
+description: Aplicativo offline de alerta antecipado de radares, semáforos, lombadas e pedágios.
+version: 0.1.0+1
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  equatable: ^2.0.7
+  bloc: ^8.1.4
+
+dev_dependencies:
+  test: ^1.25.0
+  bloc_test: ^9.1.7
+  mocktail: ^1.0.4
