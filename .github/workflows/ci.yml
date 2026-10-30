@@ -1,0 +1,46 @@
+name: CI Pipeline - Sentinela
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  test-and-coverage:
+    name: Testes BDD/TDD & Auditoria de Cobertura (>= 90%)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Instalar Dependências
+        run: dart pub get
+
+      - name: Análise Estática de Código (dart analyze)
+        run: dart analyze --fatal-infos
+
+      - name: Executar Suíte de Testes BDD/TDD com Cobertura (>= 90%)
+        run: dart run coverage:test_with_coverage --fail-under 90
+
+  security-scan:
+    name: Análise de Segurança & Vulnerabilidades (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Trivy Vulnerability & Secret Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
