@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:sentinela/background/tracking_service/background_tracking_service.dart';
 import 'package:sentinela/core/audio/audio_alert_player.dart';
+import 'package:sentinela/core/engine/adaptive_gps_sampler.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
 import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/data/repository/poi_repository.dart';
@@ -337,6 +338,56 @@ void main() {
           .having((p) => p.roadName, 'roadName', 'Av. Paulista')))).called(1);
 
       await serviceWithPassages.dispose();
+      await gpsController.close();
+    });
+
+    test('deve atualizar AdaptiveGpsSampler e redefinir ao parar tracking', () async {
+      when(() => mockAlertMachine.state).thenReturn(const AlertState(status: AlertStatus.idle));
+      final sampler = AdaptiveGpsSampler(stationaryThreshold: const Duration(seconds: 10));
+      when(() => mockRepository.findNearbyPois(
+            latitude: any(named: 'latitude'),
+            longitude: any(named: 'longitude'),
+            radiusMeters: any(named: 'radiusMeters'),
+          )).thenAnswer((_) async => []);
+
+      final serviceWithSampler = BackgroundTrackingService(
+        repository: mockRepository,
+        alertMachine: mockAlertMachine,
+        audioPlayer: mockAudioPlayer,
+        overlayService: mockOverlayService,
+        adaptiveSampler: sampler,
+      );
+
+      final gpsController = StreamController<VehiclePosition>();
+      await serviceWithSampler.startTracking(gpsController.stream);
+
+      final t0 = DateTime(2026, 10, 30, 10, 0, 0);
+      gpsController.add(VehiclePosition(
+        latitude: -23.5,
+        longitude: -46.6,
+        speedKmh: 0.0,
+        bearing: 0,
+        accuracyMeters: 5,
+        timestamp: t0,
+      ));
+      await pumpEventQueue();
+      expect(sampler.isStationary, isFalse);
+
+      gpsController.add(VehiclePosition(
+        latitude: -23.5,
+        longitude: -46.6,
+        speedKmh: 0.0,
+        bearing: 0,
+        accuracyMeters: 5,
+        timestamp: t0.add(const Duration(seconds: 15)),
+      ));
+      await pumpEventQueue();
+      expect(sampler.isStationary, isTrue);
+
+      await serviceWithSampler.stopTracking();
+      expect(sampler.isStationary, isFalse);
+
+      await serviceWithSampler.dispose();
       await gpsController.close();
     });
   });

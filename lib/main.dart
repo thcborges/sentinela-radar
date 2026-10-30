@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sqlite3/sqlite3.dart';
+import 'package:sentinela/core/diagnostics/system_diagnostics.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
 import 'package:sentinela/core/hardware/wakelock_manager.dart';
 import 'package:sentinela/core/location/geolocator_location_service.dart';
@@ -8,6 +9,7 @@ import 'package:sentinela/core/location/location_service_interface.dart';
 import 'package:sentinela/core/network/connectivity_checker.dart';
 import 'package:sentinela/core/theme/sentinela_theme.dart';
 import 'package:sentinela/data/database/database_manager.dart';
+import 'package:sentinela/data/database/seed_database_loader.dart';
 import 'package:sentinela/data/repository/poi_repository.dart';
 import 'package:sentinela/data/sync/poi_sync_service.dart';
 import 'package:sentinela/features/dashboard/bloc/dashboard_cubit.dart';
@@ -17,8 +19,9 @@ import 'package:sentinela/features/overlay/widgets/floating_overlay_widget.dart'
 import 'package:sentinela/features/stats/bloc/stats_cubit.dart';
 import 'package:sentinela/features/stats/repository/passage_repository.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SeedDatabaseLoader().ensureDatabaseInstalled(targetPath: 'sentinela_brasil.db');
   runApp(const SentinelaApp());
 }
 
@@ -49,6 +52,7 @@ class SentinelaApp extends StatefulWidget {
   final LocationService? locationService;
   final NetworkConnectivityChecker? connectivityChecker;
   final OverlayService? overlayService;
+  final Database? database;
 
   const SentinelaApp({
     super.key,
@@ -57,6 +61,7 @@ class SentinelaApp extends StatefulWidget {
     this.locationService,
     this.connectivityChecker,
     this.overlayService,
+    this.database,
   });
 
   @override
@@ -73,13 +78,19 @@ class _SentinelaAppState extends State<SentinelaApp> {
   late StatsCubit _statsCubit;
   late DashboardCubit _dashboardCubit;
   late WakelockManager _wakelockManager;
+  late SystemDiagnosticsService _diagnosticsService;
   LocationService? _locationService;
   OverlayService? _overlayService;
 
   @override
   void initState() {
     super.initState();
-    if (widget.useInMemoryDb) {
+    if (widget.database != null) {
+      _rawDb = widget.database!;
+      _wakelockManager = widget.wakelockManager ?? PlatformWakelockManager();
+      _locationService = widget.locationService;
+      _overlayService = widget.overlayService;
+    } else if (widget.useInMemoryDb) {
       _rawDb = sqlite3.openInMemory();
       _wakelockManager = widget.wakelockManager ?? PlatformWakelockManager();
       _locationService = widget.locationService;
@@ -105,6 +116,13 @@ class _SentinelaAppState extends State<SentinelaApp> {
     _passageRepository.initSchema();
     _statsCubit = StatsCubit(repository: _passageRepository);
     _statsCubit.loadStats();
+
+    _diagnosticsService = SystemDiagnosticsService(
+      locationService: _locationService ?? GeolocatorLocationService(),
+      repository: _repository,
+      dbManager: _dbManager,
+      connectivityChecker: widget.connectivityChecker ?? PlatformConnectivityChecker(),
+    );
 
     _dashboardCubit = DashboardCubit(
       repository: _repository,
@@ -135,6 +153,7 @@ class _SentinelaAppState extends State<SentinelaApp> {
           wakelockManager: _wakelockManager,
           locationService: _locationService,
           overlayService: _overlayService,
+          diagnosticsService: _diagnosticsService,
         ),
       ),
     );

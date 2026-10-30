@@ -87,6 +87,31 @@ Para viabilizar a execução nos sistemas móveis sem comprometer a testabilidad
 
 ---
 
+## 🔋 Amostragem Adaptativa de GPS & Gestão Térmica (`AdaptiveGpsSampler`)
+
+Em trânsito lento ou paradas prolongadas (como semáforos ou engarrafamentos), consultas geodésicas de alta frequência sobre o índice R*Tree demandam processamento desnecessário.
+O `AdaptiveGpsSampler` identifica automaticamente quando a velocidade do veículo permanece inferior a 5 km/h por mais de 30 segundos, relaxando a taxa de amostragem de 1 Hz (filtro de 2 metros) para 0.33 Hz (filtro de 10 metros). Assim que o veículo retoma movimento ($\ge 5\text{ km/h}$), o modo de alta responsividade de 1 Hz é restaurado imediatamente.
+
+---
+
+## 🩺 Diagnóstico e Saúde do Sistema (`SystemDiagnosticsService`)
+
+Integrado diretamente ao painel principal do motorista, o serviço de diagnósticos executa auditorias ativas sob demanda:
+* **Sensores e Permissões:** Validação de chip GPS e permissões em segundo plano (`whileInUse` ou `always`).
+* **Integridade da Base SQLite R\*Tree:** Checagem de integridade e contagem total de POIs indexados, validando a execução de queries espaciais.
+* **Tamanho e Armazenamento:** Verificação do espaço ocupado pela base compilada no disco.
+* **Conectividade:** Status de rede Wi-Fi e dados móveis.
+
+---
+
+## 🚀 Cópia Segura no Primeiro Boot (`SeedDatabaseLoader`)
+
+Para garantir operação 100% offline imediata no primeiro boot sem exigir download de rede:
+1. O asset pré-embarcado `assets/db/sentinela_brasil.db` é verificado no armazenamento do dispositivo.
+2. Se inexistente, é escrito atomicamente via arquivo temporário `.tmp` e renomeado após flushing de I/O, impedindo corrupção em caso de encerramento prematuro.
+
+---
+
 ## ⚡ Fluxo de Execução Concorrente com Isolates
 
 Para assegurar uma taxa de quadros ininterrupta de 60 a 120 fps no velocímetro durante a ingestão de bases de dados massivas com dezenas de milhares de registros, operações de rede e parsing JSON são descarregadas para `Isolates` independentes via `compute()`.

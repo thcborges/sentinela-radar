@@ -1,5 +1,6 @@
 import 'dart:async';
 import '../../core/audio/audio_alert_player.dart';
+import '../../core/engine/adaptive_gps_sampler.dart';
 import '../../core/engine/alert_machine.dart';
 import '../../core/models/poi_model.dart';
 import '../../data/repository/poi_repository.dart';
@@ -18,6 +19,7 @@ class BackgroundTrackingService {
   final AudioAlertPlayer _audioPlayer;
   final OverlayService _overlayService;
   final PassageRepository? _passageRepository;
+  final AdaptiveGpsSampler? _adaptiveSampler;
 
   bool isVoiceEnabled;
   bool isBeepEnabled;
@@ -37,6 +39,7 @@ class BackgroundTrackingService {
     required AudioAlertPlayer audioPlayer,
     required OverlayService overlayService,
     PassageRepository? passageRepository,
+    AdaptiveGpsSampler? adaptiveSampler,
     this.isVoiceEnabled = true,
     this.isBeepEnabled = true,
     Set<PoiType>? enabledPoiTypes,
@@ -45,11 +48,13 @@ class BackgroundTrackingService {
         _audioPlayer = audioPlayer,
         _overlayService = overlayService,
         _passageRepository = passageRepository,
+        _adaptiveSampler = adaptiveSampler,
         enabledPoiTypes = enabledPoiTypes ?? Set.from(PoiType.values);
 
   bool get isRunning => _isRunning;
   ActiveAlert? get currentAlert => _currentAlert;
   VehiclePosition? get lastPosition => _lastPosition;
+  AdaptiveGpsSampler? get adaptiveSampler => _adaptiveSampler;
 
   Stream<ActiveAlert?> get alertStream => _alertController.stream;
   Stream<VehiclePosition> get positionStream => _positionController.stream;
@@ -73,6 +78,7 @@ class BackgroundTrackingService {
 
     _lastPosition = position;
     _positionController.add(position);
+    _adaptiveSampler?.updateSpeed(position.speedKmh, timestamp: position.timestamp);
 
     // 1. Busca POIs no índice espacial SQLite R*Tree (raio de 1200 metros)
     final nearbyPois = await _repository.findNearbyPois(
@@ -136,6 +142,7 @@ class BackgroundTrackingService {
     _lastPosition = null;
     _alertMachine.reset();
     _audioPlayer.reset();
+    _adaptiveSampler?.reset();
   }
 
   /// Encerra permanentemente todos os canais do serviço.

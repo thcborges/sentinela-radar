@@ -20,18 +20,21 @@ A estabilidade e precisão do **Sentinela** são garantidas por uma política in
 | Módulo / Pacote | Linhas Cobertas | Cobertura (%) | Status |
 | :--- | :---: | :---: | :---: |
 | `core/geo/` (Haversine, Bearing, Bounding Box) | 61 / 63 | **96.8%** | ✅ Aprovado |
-| `core/engine/` (`AlertMachine`) | 91 / 94 | **96.8%** | ✅ Aprovado |
-| `core/audio/` (`AudioAlertPlayer`, `PlatformTtsEngine`) | 62 / 65 | **95.4%** | ✅ Aprovado |
-| `core/location/` (`GeolocatorLocationService`) | 32 / 34 | **94.1%** | ✅ Aprovado |
-| `core/hardware/` (`PlatformWakelockManager`) | 18 / 18 | **100.0%** | ✅ Aprovado |
-| `core/network/` (`PlatformConnectivityChecker`) | 19 / 20 | **95.0%** | ✅ Aprovado |
-| `data/database/` & `repository/` | 130 / 132 | **98.4%** | ✅ Aprovado |
-| `data/sync/` (`PoiSyncService`, Parser) | 135 / 142 | **95.1%** | ✅ Aprovado |
-| `features/dashboard/` (Speedometer, Sonar, Banner) | 225 / 248 | **90.7%** | ✅ Aprovado |
-| `features/overlay/` (`FloatingOverlayWidget`, Service) | 79 / 80 | **98.7%** | ✅ Aprovado |
-| `features/stats/` (`PassageRepository`, `StatsCubit`) | 148 / 150 | **98.6%** | ✅ Aprovado |
-| `background/` (`BackgroundTrackingService`) | 43 / 43 | **100.0%** | ✅ Aprovado |
-| **Total Consolidado** | **1375 / 1445 linhas** | **95.16%** | ✅ Aprovado (159 testes) |
+| `core/engine/` (`AlertMachine`, `AdaptiveGpsSampler`) | 105 / 109 | **96.3%** | ✅ Aprovado |
+| `core/diagnostics/` (`SystemDiagnosticsService`) | 32 / 32 | **100.0%** | ✅ Aprovado |
+| `core/audio/` (`AudioAlertPlayer`, `PlatformTtsEngine`, Formatter) | 56 / 57 | **98.2%** | ✅ Aprovado |
+| `core/location/` (`GeolocatorLocationService`) | 26 / 27 | **96.3%** | ✅ Aprovado |
+| `core/hardware/` (`PlatformWakelockManager`) | 9 / 9 | **100.0%** | ✅ Aprovado |
+| `core/network/` (`PlatformConnectivityChecker`) | 13 / 13 | **100.0%** | ✅ Aprovado |
+| `data/database/` & `repository/` (`DatabaseManager`, `PoiRepository`, `SeedDatabaseLoader`) | 143 / 145 | **98.6%** | ✅ Aprovado |
+| `data/sync/` (`PoiSyncService`, `PoiSyncParser`) | 124 / 132 | **93.9%** | ✅ Aprovado |
+| `features/dashboard/` (Speedometer, Sonar, Banner, DashboardScreen, Cubit) | 371 / 381 | **97.4%** | ✅ Aprovado |
+| `features/overlay/` (`FloatingOverlayWidget`, `OverlayService`) | 79 / 80 | **98.8%** | ✅ Aprovado |
+| `features/settings/` (`SettingsScreen`) | 129 / 131 | **98.5%** | ✅ Aprovado |
+| `features/stats/` (`PassageRepository`, `StatsCubit`, `StatsScreen`, Models) | 196 / 205 | **95.6%** | ✅ Aprovado |
+| `background/` (`BackgroundTrackingService`) | 56 / 57 | **98.2%** | ✅ Aprovado |
+| `main.dart` & `overlayMain` | 61 / 65 | **93.8%** | ✅ Aprovado |
+| **Total Consolidado** | **1519 / 1565 linhas** | **97.06%** | ✅ Aprovado (179 testes) |
 
 ---
 
