@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sentinela/core/diagnostics/system_diagnostics.dart';
 import 'package:sentinela/core/hardware/wakelock_manager.dart';
 import 'package:sentinela/core/location/location_service_interface.dart';
 import 'package:sentinela/core/models/poi_model.dart';
@@ -22,6 +23,7 @@ class DashboardScreen extends StatefulWidget {
   final WakelockManager? wakelockManager;
   final LocationService? locationService;
   final OverlayService? overlayService;
+  final SystemDiagnosticsService? diagnosticsService;
 
   const DashboardScreen({
     super.key,
@@ -30,6 +32,7 @@ class DashboardScreen extends StatefulWidget {
     this.wakelockManager,
     this.locationService,
     this.overlayService,
+    this.diagnosticsService,
   });
 
   @override
@@ -88,6 +91,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 );
               },
+            ),
+          if (widget.diagnosticsService != null)
+            IconButton(
+              key: const Key('dashboard_diagnostics_button'),
+              icon: const Icon(Icons.health_and_safety_rounded),
+              tooltip: 'Diagnóstico do Sistema',
+              onPressed: () => _showDiagnosticsModal(context),
             ),
           IconButton(
             icon: const Icon(Icons.settings_rounded),
@@ -243,6 +253,140 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         },
       ),
+    );
+  }
+
+  void _showDiagnosticsModal(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: SentinelaTheme.surfaceDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return FutureBuilder<DiagnosticReport>(
+          future: widget.diagnosticsService!.runDiagnostics(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const SizedBox(
+                height: 250,
+                child: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+            final report = snapshot.data;
+            if (report == null) {
+              return const SizedBox(
+                height: 200,
+                child: Center(child: Text('Erro ao obter diagnóstico.')),
+              );
+            }
+            return Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        report.isReadyForNavigation
+                            ? Icons.check_circle_rounded
+                            : Icons.warning_amber_rounded,
+                        color: report.isReadyForNavigation
+                            ? SentinelaTheme.alertNormal
+                            : SentinelaTheme.alertWarning,
+                        size: 28,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          report.summaryMessage,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(color: Color(0xFF333333), height: 32),
+                  _buildDiagnosticRow(
+                    label: 'GPS Hardware',
+                    status: report.isGpsHardwareEnabled ? 'Ativo' : 'Desativado',
+                    isOk: report.isGpsHardwareEnabled,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildDiagnosticRow(
+                    label: 'Permissão GPS',
+                    status: report.gpsPermission.name,
+                    isOk: report.gpsPermission == LocationPermissionStatus.whileInUse ||
+                        report.gpsPermission == LocationPermissionStatus.always,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildDiagnosticRow(
+                    label: 'Base SQLite R*Tree',
+                    status: report.isDatabaseHealthy
+                        ? '${report.totalPoisIndexed} POIs indexados'
+                        : 'Erro de integridade',
+                    isOk: report.isDatabaseHealthy && report.totalPoisIndexed > 0,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildDiagnosticRow(
+                    label: 'Conectividade',
+                    status: report.isWifiConnected
+                        ? 'Wi-Fi'
+                        : report.isNetworkConnected
+                            ? 'Dados Móveis'
+                            : 'Offline (OK)',
+                    isOk: true,
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildDiagnosticRow({
+    required String label,
+    required String status,
+    required bool isOk,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFFB0B0B0),
+            fontSize: 14,
+          ),
+        ),
+        Row(
+          children: [
+            Icon(
+              isOk ? Icons.check_circle : Icons.error_outline,
+              size: 16,
+              color: isOk ? SentinelaTheme.alertNormal : SentinelaTheme.alertCritical,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              status,
+              style: TextStyle(
+                color: isOk ? Colors.white : SentinelaTheme.alertCritical,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

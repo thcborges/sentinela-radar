@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:sentinela/core/diagnostics/system_diagnostics.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
 import 'package:sentinela/core/hardware/wakelock_manager.dart';
 import 'package:sentinela/core/location/location_service_interface.dart';
@@ -21,6 +22,7 @@ class MockPoiSyncService extends Mock implements PoiSyncService {}
 class MockStatsCubit extends MockCubit<StatsState> implements StatsCubit {}
 class MockWakelockManager extends Mock implements WakelockManager {}
 class MockLocationService extends Mock implements LocationService {}
+class MockSystemDiagnosticsService extends Mock implements SystemDiagnosticsService {}
 
 void main() {
   late MockPoiRepository mockRepo;
@@ -271,6 +273,108 @@ void main() {
       expect(dashboardCubit.state.currentBearing, equals(90.0));
 
       await streamController.close();
+    });
+
+    testWidgets('deve abrir modal de diagnóstico ao tocar no botão de diagnóstico na AppBar', (tester) async {
+      final mockDiagnostics = MockSystemDiagnosticsService();
+      when(() => mockDiagnostics.runDiagnostics()).thenAnswer(
+        (_) async => const DiagnosticReport(
+          isGpsHardwareEnabled: true,
+          gpsPermission: LocationPermissionStatus.whileInUse,
+          isDatabaseHealthy: true,
+          totalPoisIndexed: 70000,
+          databaseSizeMb: 15.5,
+          isNetworkConnected: true,
+          isWifiConnected: true,
+          isReadyForNavigation: true,
+          summaryMessage: 'Sistema 100% operacional para navegação.',
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: BlocProvider<DashboardCubit>.value(
+            value: dashboardCubit,
+            child: DashboardScreen(
+              syncService: mockSyncService,
+              diagnosticsService: mockDiagnostics,
+            ),
+          ),
+        ),
+      );
+
+      final diagButton = find.byKey(const Key('dashboard_diagnostics_button'));
+      expect(diagButton, findsOneWidget);
+
+      await tester.tap(diagButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sistema 100% operacional para navegação.'), findsOneWidget);
+      expect(find.text('GPS Hardware'), findsOneWidget);
+      expect(find.text('70000 POIs indexados'), findsOneWidget);
+      expect(find.text('Wi-Fi'), findsOneWidget);
+    });
+
+    testWidgets('deve exibir status de diagnóstico offline e erro de integridade', (tester) async {
+      final mockDiagnostics = MockSystemDiagnosticsService();
+      when(() => mockDiagnostics.runDiagnostics()).thenAnswer(
+        (_) async => const DiagnosticReport(
+          isGpsHardwareEnabled: false,
+          gpsPermission: LocationPermissionStatus.always,
+          isDatabaseHealthy: false,
+          totalPoisIndexed: 0,
+          databaseSizeMb: 0.0,
+          isNetworkConnected: false,
+          isWifiConnected: false,
+          isReadyForNavigation: false,
+          summaryMessage: 'Chip de GPS desativado.',
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: BlocProvider<DashboardCubit>.value(
+            value: dashboardCubit,
+            child: DashboardScreen(
+              syncService: mockSyncService,
+              diagnosticsService: mockDiagnostics,
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('dashboard_diagnostics_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Desativado'), findsOneWidget);
+      expect(find.text('Offline (OK)'), findsOneWidget);
+      expect(find.text('Erro de integridade'), findsOneWidget);
+    });
+
+    testWidgets('deve renderizar layout portrait quando a orientação da tela for vertical', (tester) async {
+      tester.view.physicalSize = const Size(600, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: BlocProvider<DashboardCubit>.value(
+            value: dashboardCubit,
+            child: DashboardScreen(syncService: mockSyncService),
+          ),
+        ),
+      );
+
+      expect(find.text('SENTINELA'), findsOneWidget);
+      expect(find.byKey(const Key('dashboard_speedometer')), findsOneWidget);
+      expect(find.byKey(const Key('dashboard_sonar')), findsOneWidget);
+      expect(find.byKey(const Key('dashboard_alert_banner')), findsOneWidget);
     });
   });
 }
