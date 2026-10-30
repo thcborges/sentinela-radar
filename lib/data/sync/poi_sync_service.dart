@@ -62,6 +62,9 @@ class PoiSyncService {
     }
   }
 
+  /// Dispara a sincronização in-app sob demanda.
+  Future<bool> startInAppUpdate() => syncFromRemote();
+
   /// Dispara a sincronização conectando ao endpoint Overpass API via rede.
   Future<bool> syncFromRemote({String? customQuery}) async {
     _progressController.add(const SyncProgress(
