@@ -8,6 +8,8 @@ import 'package:sentinela/data/repository/poi_repository.dart';
 import 'package:sentinela/data/sync/poi_sync_service.dart';
 import 'package:sentinela/features/dashboard/bloc/dashboard_cubit.dart';
 import 'package:sentinela/features/dashboard/screens/dashboard_screen.dart';
+import 'package:sentinela/features/stats/bloc/stats_cubit.dart';
+import 'package:sentinela/features/stats/repository/passage_repository.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,6 +35,8 @@ class _SentinelaAppState extends State<SentinelaApp> {
   late PoiRepository _repository;
   late AlertMachine _alertMachine;
   late PoiSyncService _syncService;
+  late PassageRepository _passageRepository;
+  late StatsCubit _statsCubit;
   late DashboardCubit _dashboardCubit;
 
   @override
@@ -51,6 +55,11 @@ class _SentinelaAppState extends State<SentinelaApp> {
     _alertMachine = AlertMachine();
     _syncService = PoiSyncService(_rawDb);
 
+    _passageRepository = PassageRepository(_rawDb);
+    _passageRepository.initSchema();
+    _statsCubit = StatsCubit(repository: _passageRepository);
+    _statsCubit.loadStats();
+
     _dashboardCubit = DashboardCubit(
       repository: _repository,
       alertMachine: _alertMachine,
@@ -60,6 +69,7 @@ class _SentinelaAppState extends State<SentinelaApp> {
   @override
   void dispose() {
     _dashboardCubit.close();
+    _statsCubit.close();
     _syncService.dispose();
     _rawDb.close();
     super.dispose();
@@ -75,6 +85,7 @@ class _SentinelaAppState extends State<SentinelaApp> {
         value: _dashboardCubit,
         child: DashboardScreen(
           syncService: _syncService,
+          statsCubit: _statsCubit,
         ),
       ),
     );
