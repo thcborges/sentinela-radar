@@ -1,0 +1,37 @@
+# Binários e pacotes compilados
+*.apk
+*.aab
+*.ipa
+*.app
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+ephemeral/
+
+# SQLite temporários e logs
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Ambiente e segredos
+.env
+.env.*
+!.env.example
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# Node / VitePress
+node_modules/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
