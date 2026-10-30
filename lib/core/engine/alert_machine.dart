@@ -1,5 +1,6 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'alert_preferences.dart';
 import '../geo/bearing.dart';
 import '../geo/haversine.dart';
 import '../models/alert_distance_calculator.dart';
@@ -83,7 +84,16 @@ class AlertState extends Equatable {
 /// Máquina de estados finitos reativa para processamento contínuo de coordenadas GPS,
 /// filtragem geométrica e priorização de alertas de radares, semáforos e pedágios.
 class AlertMachine extends Cubit<AlertState> {
-  AlertMachine() : super(AlertState.idle());
+  AlertPreferences preferences;
+
+  AlertMachine({AlertPreferences? preferences})
+      : preferences = preferences ?? const AlertPreferences(),
+        super(AlertState.idle());
+
+  /// Atualiza as preferências e tolerâncias do motor de alertas.
+  void updatePreferences(AlertPreferences newPreferences) {
+    preferences = newPreferences;
+  }
 
   /// Força o retorno imediato ao estado IDLE.
   void reset() {
@@ -118,12 +128,14 @@ class AlertMachine extends Cubit<AlertState> {
       final alertDistance = AlertDistanceCalculator.calculateAlertDistance(
         poi.type,
         position.speedKmh,
+        customAnticipationSeconds: preferences.anticipationTimeSeconds,
       );
 
       final approachingDistance =
           AlertDistanceCalculator.calculateApproachingDistance(
         poi.type,
         position.speedKmh,
+        customAnticipationSeconds: preferences.anticipationTimeSeconds,
       );
 
       // Descarte preliminar por distância
@@ -165,9 +177,11 @@ class AlertMachine extends Cubit<AlertState> {
       );
       final relBearing = bearingDifference(position.bearing, targetBearing);
 
-      // Classificação do estado individual
-      final bool isOverSpeed =
-          poi.speedLimit != null && position.speedKmh > poi.speedLimit!;
+      // Classificação do estado individual com tolerância customizada
+      final bool isOverSpeed = preferences.isOverSpeed(
+        position.speedKmh,
+        poi.speedLimit,
+      );
 
       final AlertStatus poiStatus;
       if (distance <= alertDistance) {

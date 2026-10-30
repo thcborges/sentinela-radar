@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:sentinela/core/backup/backup_restore_service.dart';
 import 'package:sentinela/core/hardware/wakelock_manager.dart';
 import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/core/theme/sentinela_theme.dart';
@@ -14,6 +15,7 @@ class MockPoiSyncService extends Mock implements PoiSyncService {}
 class MockDashboardCubit extends Mock implements DashboardCubit {}
 class MockOverlayService extends Mock implements OverlayService {}
 class MockWakelockManager extends Mock implements WakelockManager {}
+class MockBackupRestoreService extends Mock implements BackupRestoreService {}
 
 void main() {
   late MockPoiSyncService mockSyncService;
@@ -269,6 +271,63 @@ void main() {
       await tester.tap(find.text('Manter Tela Ativa (Wakelock)'), warnIfMissed: false);
       await tester.pump();
       verify(() => mockWakelock.enable()).called(1);
+    });
+
+    testWidgets('deve exportar backup e exibir SnackBar ao tocar no botão de exportar', (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final mockBackup = MockBackupRestoreService();
+      when(() => mockBackup.exportBackupToJson(preferences: any(named: 'preferences')))
+          .thenAnswer((_) async => '{"version": 1}');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: SettingsScreen(
+            syncService: mockSyncService,
+            backupService: mockBackup,
+          ),
+        ),
+      );
+
+      await tester.scrollUntilVisible(find.byKey(const Key('settings_export_backup_button')), 300);
+      expect(find.byKey(const Key('settings_export_backup_button')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('settings_export_backup_button')), warnIfMissed: false);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Backup gerado com sucesso!'), findsOneWidget);
+      verify(() => mockBackup.exportBackupToJson(preferences: any(named: 'preferences'))).called(1);
+    });
+
+    testWidgets('deve alterar preferências de tolerância e alertOnlyIfOverSpeed', (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: SettingsScreen(
+            syncService: mockSyncService,
+          ),
+        ),
+      );
+
+      await tester.scrollUntilVisible(find.byKey(const Key('settings_alert_only_overspeed_switch')), 300);
+      expect(find.byKey(const Key('settings_alert_only_overspeed_switch')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('settings_alert_only_overspeed_switch')), warnIfMissed: false);
+      await tester.pump();
     });
   });
 }

@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:sentinela/core/backup/backup_restore_service.dart';
+import 'package:sentinela/core/engine/alert_preferences.dart';
 import 'package:sentinela/core/hardware/wakelock_manager.dart';
 import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/core/theme/sentinela_theme.dart';
@@ -15,6 +17,8 @@ class SettingsScreen extends StatefulWidget {
   final DashboardCubit? dashboardCubit;
   final OverlayService? overlayService;
   final WakelockManager? wakelockManager;
+  final BackupRestoreService? backupService;
+  final AlertPreferences? initialPreferences;
 
   const SettingsScreen({
     super.key,
@@ -24,6 +28,8 @@ class SettingsScreen extends StatefulWidget {
     this.dashboardCubit,
     this.overlayService,
     this.wakelockManager,
+    this.backupService,
+    this.initialPreferences,
   });
 
   @override
@@ -51,9 +57,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _onlyWifiSync = true;
   bool _keepScreenAwake = true;
 
+  // Parâmetros de Alerta & Tolerâncias
+  late AlertPreferences _preferences;
+  double _speedToleranceKmh = 0.0;
+  bool _alertOnlyIfOverSpeed = false;
+  double _anticipationSeconds = 15.0;
+
   @override
   void initState() {
     super.initState();
+    _preferences = widget.initialPreferences ?? const AlertPreferences();
+    _speedToleranceKmh = _preferences.speedToleranceKmh;
+    _alertOnlyIfOverSpeed = _preferences.alertOnlyIfOverSpeed;
+    _anticipationSeconds = _preferences.anticipationTimeSeconds;
+    _audioVoiceTts = _preferences.voiceEnabled;
+    _audioBeeps = _preferences.soundEnabled;
+
     _stats = Map<String, int>.from(widget.initialStats);
     _overlayActive = widget.overlayService?.isOverlayOpen ?? false;
     _syncSubscription = widget.syncService.progressStream.listen((progress) {
@@ -66,6 +85,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
         });
       }
     });
+  }
+
+  void _updatePreferences() {
+    final newPrefs = _preferences.copyWith(
+      speedToleranceKmh: _speedToleranceKmh,
+      alertOnlyIfOverSpeed: _alertOnlyIfOverSpeed,
+      anticipationTimeSeconds: _anticipationSeconds,
+      soundEnabled: _audioBeeps,
+      voiceEnabled: _audioVoiceTts,
+    );
+    _preferences = newPrefs;
+    widget.dashboardCubit?.alertMachine.updatePreferences(newPrefs);
+  }
+
+  Future<void> _exportBackup() async {
+    if (widget.backupService != null) {
+      await widget.backupService!.exportBackupToJson(preferences: _preferences);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Backup gerado com sucesso!'),
+            backgroundColor: SentinelaTheme.alertNormal,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -366,6 +411,117 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       await widget.wakelockManager?.disable();
                     }
                   },
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // 5. Seção de Parâmetros de Alerta & Tolerâncias
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Text(
+              'Parâmetros de Alerta & Tolerâncias',
+              style: TextStyle(
+                color: Color(0xFFB0B0B0),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          Card(
+            color: SentinelaTheme.surfaceContainerDark,
+            child: Column(
+              children: [
+                SwitchListTile(
+                  key: const Key('settings_alert_only_overspeed_switch'),
+                  title: const Text('Silencioso se dentro do Limite'),
+                  subtitle: const Text('Emitir avisos sonoros apenas em caso de excesso de velocidade'),
+                  value: _alertOnlyIfOverSpeed,
+                  onChanged: (val) {
+                    setState(() => _alertOnlyIfOverSpeed = val);
+                    _updatePreferences();
+                  },
+                ),
+                const Divider(height: 1, color: Color(0xFF262626)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Margem de Tolerância: +${_speedToleranceKmh.toInt()} km/h',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      Slider(
+                        key: const Key('settings_speed_tolerance_slider'),
+                        value: _speedToleranceKmh,
+                        min: 0.0,
+                        max: 15.0,
+                        divisions: 3,
+                        onChanged: (val) {
+                          setState(() => _speedToleranceKmh = val);
+                          _updatePreferences();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: Color(0xFF262626)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Tempo de Antecipação: ${_anticipationSeconds.toInt()} segundos',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      Slider(
+                        key: const Key('settings_anticipation_slider'),
+                        value: _anticipationSeconds,
+                        min: 10.0,
+                        max: 25.0,
+                        divisions: 3,
+                        onChanged: (val) {
+                          setState(() => _anticipationSeconds = val);
+                          _updatePreferences();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // 6. Seção de Backup & Restauração (100% Offline)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Text(
+              'Backup & Privacidade Local',
+              style: TextStyle(
+                color: Color(0xFFB0B0B0),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          Card(
+            color: SentinelaTheme.surfaceContainerDark,
+            child: Column(
+              children: [
+                ListTile(
+                  key: const Key('settings_export_backup_button'),
+                  leading: const Icon(Icons.download_rounded, color: SentinelaTheme.alertNormal),
+                  title: const Text('Exportar Backup JSON'),
+                  subtitle: const Text('Salva histórico e preferências localmente no aparelho'),
+                  onTap: _exportBackup,
                 ),
               ],
             ),
