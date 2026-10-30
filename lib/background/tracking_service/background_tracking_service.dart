@@ -3,6 +3,7 @@ import '../../core/audio/audio_alert_player.dart';
 import '../../core/engine/adaptive_gps_sampler.dart';
 import '../../core/engine/alert_machine.dart';
 import '../../core/models/poi_model.dart';
+import '../../core/platform/live_activity_service.dart';
 import '../../data/repository/poi_repository.dart';
 import '../../features/overlay/services/overlay_service.dart';
 import '../../features/stats/models/passage_record.dart';
@@ -20,6 +21,7 @@ class BackgroundTrackingService {
   final OverlayService _overlayService;
   final PassageRepository? _passageRepository;
   final AdaptiveGpsSampler? _adaptiveSampler;
+  final LiveActivityService? _liveActivityService;
 
   bool isVoiceEnabled;
   bool isBeepEnabled;
@@ -40,6 +42,7 @@ class BackgroundTrackingService {
     required OverlayService overlayService,
     PassageRepository? passageRepository,
     AdaptiveGpsSampler? adaptiveSampler,
+    LiveActivityService? liveActivityService,
     this.isVoiceEnabled = true,
     this.isBeepEnabled = true,
     Set<PoiType>? enabledPoiTypes,
@@ -49,6 +52,7 @@ class BackgroundTrackingService {
         _overlayService = overlayService,
         _passageRepository = passageRepository,
         _adaptiveSampler = adaptiveSampler,
+        _liveActivityService = liveActivityService,
         enabledPoiTypes = enabledPoiTypes ?? Set.from(PoiType.values);
 
   bool get isRunning => _isRunning;
@@ -123,6 +127,7 @@ class BackgroundTrackingService {
         alert,
         isVoiceEnabled: isVoiceEnabled,
         isBeepEnabled: isBeepEnabled,
+        alertOnlyIfOverSpeed: _alertMachine.preferences.alertOnlyIfOverSpeed,
       );
     }
 
@@ -130,6 +135,19 @@ class BackgroundTrackingService {
     await _overlayService.updateOverlayData(
       speedKmh: position.speedKmh,
       alert: alert,
+    );
+
+    final isAlert = alert != null && _alertMachine.state.status != AlertStatus.idle;
+    await _liveActivityService?.updateActivity(
+      LiveActivityData(
+        currentSpeedKmh: position.speedKmh,
+        speedLimitKmh: alert?.poi.speedLimit,
+        alertStatus: _alertMachine.state.status,
+        poiType: alert?.poi.type,
+        distanceMeters: alert?.distanceMeters,
+        roadName: alert?.poi.roadName,
+        isAlertActive: isAlert,
+      ),
     );
   }
 
@@ -143,6 +161,7 @@ class BackgroundTrackingService {
     _alertMachine.reset();
     _audioPlayer.reset();
     _adaptiveSampler?.reset();
+    await _liveActivityService?.stopActivity();
   }
 
   /// Encerra permanentemente todos os canais do serviço.

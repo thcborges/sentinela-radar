@@ -20,9 +20,13 @@ class AudioAlertPlayer {
     ActiveAlert alert, {
     required bool isVoiceEnabled,
     required bool isBeepEnabled,
+    bool alertOnlyIfOverSpeed = false,
   }) async {
     // 1. Fala via TTS com debounce por POI (não repete o mesmo ponto em menos de 10s)
     if (isVoiceEnabled && _ttsEngine != null) {
+      if (alertOnlyIfOverSpeed && !alert.isOverSpeed) {
+        return;
+      }
       final now = DateTime.now();
       final isNewPoi = _lastSpokenPoiId != alert.poi.id;
       final isDebounceExpired = _lastSpokenTimestamp == null ||

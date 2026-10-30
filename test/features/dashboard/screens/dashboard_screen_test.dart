@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:sentinela/core/diagnostics/system_diagnostics.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
+import 'package:sentinela/core/engine/alert_preferences.dart';
 import 'package:sentinela/core/hardware/wakelock_manager.dart';
 import 'package:sentinela/core/location/location_service_interface.dart';
 import 'package:sentinela/core/models/poi_model.dart';
@@ -48,6 +49,7 @@ void main() {
     mockSyncService = MockPoiSyncService();
 
     when(() => mockAlertMachine.state).thenReturn(const AlertState(status: AlertStatus.idle));
+    when(() => mockAlertMachine.preferences).thenReturn(const AlertPreferences());
     when(() => mockSyncService.progressStream).thenAnswer((_) => const Stream.empty());
 
     dashboardCubit = DashboardCubit(

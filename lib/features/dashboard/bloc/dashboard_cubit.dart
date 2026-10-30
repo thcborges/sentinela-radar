@@ -4,6 +4,7 @@ import 'package:sentinela/core/engine/alert_machine.dart';
 import 'package:sentinela/core/geo/bearing.dart';
 import 'package:sentinela/core/geo/haversine.dart';
 import 'package:sentinela/core/models/poi_model.dart';
+import 'package:sentinela/core/platform/live_activity_service.dart';
 import 'package:sentinela/data/repository/poi_repository.dart';
 
 /// Representação de um POI para visualização no Sonar Circular frontal.
@@ -102,13 +103,18 @@ class DashboardState extends Equatable {
 class DashboardCubit extends Cubit<DashboardState> {
   final PoiRepository _repository;
   final AlertMachine _alertMachine;
+  final LiveActivityService? _liveActivityService;
 
   DashboardCubit({
     required PoiRepository repository,
     required AlertMachine alertMachine,
+    LiveActivityService? liveActivityService,
   })  : _repository = repository,
         _alertMachine = alertMachine,
+        _liveActivityService = liveActivityService,
         super(const DashboardState());
+
+  AlertMachine get alertMachine => _alertMachine;
 
   /// Processa cada coordenada recebida do GPS nativo.
   Future<void> onLocationUpdated(VehiclePosition position) async {
@@ -187,6 +193,19 @@ class DashboardCubit extends Cubit<DashboardState> {
       nearbySonarPois: sonarItems,
       isGpsFixValid: true,
     ));
+
+    final isAlert = activeAlert != null && alertState.status != AlertStatus.idle;
+    await _liveActivityService?.updateActivity(
+      LiveActivityData(
+        currentSpeedKmh: position.speedKmh,
+        speedLimitKmh: activeAlert?.poi.speedLimit,
+        alertStatus: alertState.status,
+        poiType: activeAlert?.poi.type,
+        distanceMeters: activeAlert?.distanceMeters,
+        roadName: activeRoad,
+        isAlertActive: isAlert,
+      ),
+    );
   }
 
   /// Alterna ativação de uma categoria de POI específica (ex: silenciar lombadas).
@@ -203,5 +222,11 @@ class DashboardCubit extends Cubit<DashboardState> {
   /// Define contagem inicial de POIs na base para exibição de métricas.
   void setInitialPoiCount(int count) {
     emit(state.copyWith(totalPoisCount: count));
+  }
+
+  @override
+  Future<void> close() async {
+    await _liveActivityService?.stopActivity();
+    return super.close();
   }
 }

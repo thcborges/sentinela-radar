@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
 import 'package:sentinela/core/models/poi_model.dart';
+import 'package:sentinela/core/platform/live_activity_service.dart';
 import 'package:sentinela/data/repository/poi_repository.dart';
 import 'package:sentinela/features/dashboard/bloc/dashboard_cubit.dart';
 
@@ -128,6 +129,72 @@ void main() {
     test('setInitialPoiCount deve atualizar contagem total no estado', () {
       cubit.setInitialPoiCount(74820);
       expect(cubit.state.totalPoisCount, equals(74820));
+    });
+
+    test('alertMachine getter deve retornar a instancia correta', () {
+      expect(cubit.alertMachine, equals(mockAlertMachine));
+    });
+
+    test('onLocationUpdated e close devem atualizar e parar LiveActivityService quando fornecido', () async {
+      final fakePlatform = FakeLiveActivityPlatform(supported: true);
+      final liveService = LiveActivityService(platform: fakePlatform);
+
+      final liveCubit = DashboardCubit(
+        repository: mockRepo,
+        alertMachine: mockAlertMachine,
+        liveActivityService: liveService,
+      );
+
+      final goodPosition = VehiclePosition(
+        latitude: -23.5500,
+        longitude: -46.6300,
+        speedKmh: 80.0,
+        bearing: 90.0,
+        accuracyMeters: 5.0,
+        timestamp: DateTime(2026, 10, 30, 10, 0),
+      );
+
+      const candidatePoi = PoiPoint(
+        id: 99,
+        latitude: -23.5500,
+        longitude: -46.6200,
+        type: PoiType.fixedRadar,
+        speedLimit: 70,
+        roadName: 'Rod. dos Bandeirantes',
+      );
+
+      when(() => mockRepo.findNearbyPois(
+        latitude: -23.5500,
+        longitude: -46.6300,
+        radiusMeters: any(named: 'radiusMeters'),
+      )).thenAnswer((_) async => [candidatePoi]);
+
+      const activeAlert = ActiveAlert(
+        poi: candidatePoi,
+        distanceMeters: 250,
+        currentSpeedKmh: 80,
+        status: AlertStatus.overSpeed,
+        isOverSpeed: true,
+        targetBearing: 90.0,
+        relativeBearing: 0.0,
+      );
+
+      when(() => mockAlertMachine.updatePosition(goodPosition, any())).thenReturn(null);
+      when(() => mockAlertMachine.state).thenReturn(const AlertState(
+        status: AlertStatus.overSpeed,
+        activeAlert: activeAlert,
+      ));
+
+      await liveCubit.onLocationUpdated(goodPosition);
+
+      expect(liveService.isActive, isTrue);
+      expect(liveService.currentData?.currentSpeedKmh, equals(80.0));
+      expect(liveService.currentData?.speedLimitKmh, equals(70));
+      expect(liveService.currentData?.alertStatus, equals(AlertStatus.overSpeed));
+      expect(liveService.currentData?.isAlertActive, isTrue);
+
+      await liveCubit.close();
+      expect(liveService.isActive, isFalse);
     });
   });
 }

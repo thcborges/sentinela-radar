@@ -5,7 +5,9 @@ import 'package:sentinela/background/tracking_service/background_tracking_servic
 import 'package:sentinela/core/audio/audio_alert_player.dart';
 import 'package:sentinela/core/engine/adaptive_gps_sampler.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
+import 'package:sentinela/core/engine/alert_preferences.dart';
 import 'package:sentinela/core/models/poi_model.dart';
+import 'package:sentinela/core/platform/live_activity_service.dart';
 import 'package:sentinela/data/repository/poi_repository.dart';
 import 'package:sentinela/features/overlay/services/overlay_service.dart';
 import 'package:sentinela/features/stats/models/passage_record.dart';
@@ -63,10 +65,13 @@ void main() {
     mockAudioPlayer = MockAudioAlertPlayer();
     mockOverlayService = MockOverlayService();
 
+    when(() => mockAlertMachine.preferences).thenReturn(const AlertPreferences());
+
     when(() => mockAudioPlayer.playAlert(
           any(),
           isVoiceEnabled: any(named: 'isVoiceEnabled'),
           isBeepEnabled: any(named: 'isBeepEnabled'),
+          alertOnlyIfOverSpeed: any(named: 'alertOnlyIfOverSpeed'),
         )).thenAnswer((_) async {});
 
     when(() => mockOverlayService.updateOverlayData(
@@ -388,6 +393,74 @@ void main() {
       expect(sampler.isStationary, isFalse);
 
       await serviceWithSampler.dispose();
+      await gpsController.close();
+    });
+
+    test('deve atualizar LiveActivityService quando fornecido e parar ao encerrar', () async {
+      final fakePlatform = FakeLiveActivityPlatform(supported: true);
+      final liveService = LiveActivityService(platform: fakePlatform);
+
+      final serviceWithLive = BackgroundTrackingService(
+        repository: mockRepository,
+        alertMachine: mockAlertMachine,
+        audioPlayer: mockAudioPlayer,
+        overlayService: mockOverlayService,
+        liveActivityService: liveService,
+      );
+
+      final gpsController = StreamController<VehiclePosition>();
+      await serviceWithLive.startTracking(gpsController.stream);
+
+      const candidatePoi = PoiPoint(
+        id: 77,
+        latitude: -23.5505,
+        longitude: -46.6330,
+        type: PoiType.fixedRadar,
+        speedLimit: 60,
+        roadName: 'Av. 23 de Maio',
+      );
+
+      when(() => mockRepository.findNearbyPois(
+        latitude: -23.5505,
+        longitude: -46.6333,
+        radiusMeters: any(named: 'radiusMeters'),
+      )).thenAnswer((_) async => [candidatePoi]);
+
+      const activeAlert = ActiveAlert(
+        poi: candidatePoi,
+        distanceMeters: 200,
+        currentSpeedKmh: 65,
+        status: AlertStatus.alerting,
+        isOverSpeed: false,
+        targetBearing: 0,
+        relativeBearing: 0,
+      );
+
+      when(() => mockAlertMachine.updatePosition(any(), any())).thenReturn(null);
+      when(() => mockAlertMachine.state).thenReturn(const AlertState(
+        status: AlertStatus.alerting,
+        activeAlert: activeAlert,
+      ));
+
+      gpsController.add(VehiclePosition(
+        latitude: -23.5505,
+        longitude: -46.6333,
+        speedKmh: 65,
+        bearing: 0,
+        accuracyMeters: 5.0,
+        timestamp: DateTime(2026, 10, 30, 10, 0),
+      ));
+      await pumpEventQueue();
+
+      expect(liveService.isActive, isTrue);
+      expect(liveService.currentData?.currentSpeedKmh, equals(65.0));
+      expect(liveService.currentData?.speedLimitKmh, equals(60));
+      expect(liveService.currentData?.roadName, equals('Av. 23 de Maio'));
+
+      await serviceWithLive.stopTracking();
+      expect(liveService.isActive, isFalse);
+
+      await serviceWithLive.dispose();
       await gpsController.close();
     });
   });

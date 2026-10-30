@@ -84,6 +84,26 @@ Para viabilizar a execução nos sistemas móveis sem comprometer a testabilidad
    * Garante que a ingestão sob demanda de dezenas de milhares de radares ocorra prioritariamente sob rede Wi-Fi, preservando o plano de dados móveis 4G/5G do condutor.
 4. **Síntese de Voz Nativa Offline (`PlatformTtsEngine`):**
    * Implementação concreta de `TtsEngineInterface` operando com motor `pt-BR` e Audio Ducking.
+5. **Live Activities & Dynamic Island para iOS 16.1+ (`LiveActivityService`):**
+   * Adaptador desacoplado (`PlatformLiveActivityAdapter` e `FakeLiveActivityPlatform`) para transmissão em tempo real de velocímetro, limite da via, distância regressiva ao radar e alertas visuais pulsantes na Dynamic Island e Tela de Bloqueio do iOS.
+
+---
+
+## 🎛️ Tolerâncias Customizadas & Modo Silencioso (`AlertPreferences`)
+
+O motor de alertas suporta personalização fina das margens de fiscalização e comportamento acústico:
+* **Margens de Tolerância:** Tolerância fixa (km/h) e percentual (%) para evitar falsos positivos de excesso de velocidade ao trafegar com velocímetros analógicos aferidos.
+* **Modo Silencioso / Discreto (`alertOnlyIfOverSpeed`):** Emite avisos sonoros e síntese de voz apenas quando o condutor estiver acima da velocidade permitida na aproximação, garantindo viagens sem poluição sonora.
+* **Tempo de Antecipação Dinâmica:** Parametrização customizável do horizonte temporal de aviso (10s a 25s), escalando a distância de frenagem conforme a velocidade real.
+
+---
+
+## 💾 Backup & Restauração 100% Offline (`BackupRestoreService`)
+
+Fiel ao pilar de **Privacidade Absoluta e Soberania dos Dados**:
+* **Exportação e Importação em JSON:** Permite ao condutor extrair todo o histórico local de passagens e suas preferências personalizadas para um arquivo JSON legível e aberto.
+* **Zero Telemetria em Nuvem:** Operação estritamente local no armazenamento do dispositivo, sem intermediários ou APIs de terceiros.
+* **Restauração Atômica:** Validação de esquema e versão antes da inserção local com rollback em caso de arquivo corrompido.
 
 ---
 
