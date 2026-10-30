@@ -88,6 +88,40 @@ void main() {
       expect(summary.compliantPassages, equals(3));
       // 3 / 4 = 75%
       expect(summary.adherenceRatePercent, equals(75.0));
+      expect(summary.totalTollCost, equals(0.0));
+    });
+
+    test('deve persistir tarifas de pedágio e acumular totalTollCost no resumo', () async {
+      final now = DateTime.now();
+
+      await repository.insertPassage(PassageRecord(
+        poiId: 201,
+        poiType: PoiType.freeFlowToll,
+        vehicleSpeedKmh: 85.0,
+        timestamp: now,
+        isOverSpeed: false,
+        roadName: 'SP-099 Free Flow',
+        tollFee: 4.20,
+      ));
+
+      await repository.insertPassage(PassageRecord(
+        poiId: 202,
+        poiType: PoiType.tollBooth,
+        vehicleSpeedKmh: 40.0,
+        timestamp: now.add(const Duration(minutes: 10)),
+        isOverSpeed: false,
+        roadName: 'Praça Convencional',
+        tollFee: 8.50,
+      ));
+
+      final passages = await repository.getRecentPassages();
+      expect(passages.length, equals(2));
+      expect(passages.first.tollFee, equals(8.50));
+      expect(passages.last.tollFee, equals(4.20));
+
+      final summary = await repository.getStatsSummary();
+      expect(summary.totalPassages, equals(2));
+      expect(summary.totalTollCost, closeTo(12.70, 0.01));
     });
 
     test('deve limpar histórico completo de passagens com sucesso', () async {

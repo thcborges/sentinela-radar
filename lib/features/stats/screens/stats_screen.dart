@@ -114,6 +114,47 @@ class StatsScreen extends StatelessWidget {
                 ],
               ),
 
+              if (summary.totalTollCost > 0.0) ...[
+                const SizedBox(height: 12),
+                Container(
+                  key: const Key('stats_toll_card'),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF141A26),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: SentinelaTheme.alertInfo.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.toll_rounded, color: SentinelaTheme.alertInfo, size: 22),
+                          SizedBox(width: 10),
+                          Text(
+                            'Pedágios & Free Flow Estimados',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        'R\$ ${summary.totalTollCost.toStringAsFixed(2).replaceAll('.', ',')}',
+                        style: const TextStyle(
+                          color: SentinelaTheme.alertInfo,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               const SizedBox(height: 24),
 
               // 3. Cabeçalho de Passagens Recentes
@@ -280,6 +321,15 @@ class StatsScreen extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 10,
                       color: Color(0xFF757575),
+                    ),
+                  ),
+                if (record.tollFee != null)
+                  Text(
+                    'Tarifa: R\$ ${record.tollFee!.toStringAsFixed(2).replaceAll('.', ',')}',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: SentinelaTheme.alertInfo,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
               ],

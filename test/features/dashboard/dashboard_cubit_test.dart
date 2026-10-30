@@ -126,6 +126,22 @@ void main() {
       expect(cubit.state.enabledPoiTypes.contains(PoiType.physicalSpeedBump), isTrue);
     });
 
+    test('deve alternar modo espelho HUD para para-brisa via toggleHudMirrorMode e setHudMirrorMode', () {
+      expect(cubit.state.isHudMirrorMode, isFalse);
+
+      cubit.toggleHudMirrorMode();
+      expect(cubit.state.isHudMirrorMode, isTrue);
+
+      cubit.toggleHudMirrorMode();
+      expect(cubit.state.isHudMirrorMode, isFalse);
+
+      cubit.setHudMirrorMode(true);
+      expect(cubit.state.isHudMirrorMode, isTrue);
+
+      cubit.setHudMirrorMode(false);
+      expect(cubit.state.isHudMirrorMode, isFalse);
+    });
+
     test('setInitialPoiCount deve atualizar contagem total no estado', () {
       cubit.setInitialPoiCount(74820);
       expect(cubit.state.totalPoisCount, equals(74820));

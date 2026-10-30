@@ -36,6 +36,7 @@ class DashboardState extends Equatable {
   final bool isGpsFixValid;
   final int totalPoisCount;
   final Set<PoiType> enabledPoiTypes;
+  final bool isHudMirrorMode;
 
   const DashboardState({
     this.currentSpeedKmh = 0.0,
@@ -46,6 +47,7 @@ class DashboardState extends Equatable {
     this.nearbySonarPois = const [],
     this.isGpsFixValid = false,
     this.totalPoisCount = 0,
+    this.isHudMirrorMode = false,
     this.enabledPoiTypes = const {
       PoiType.fixedRadar,
       PoiType.mobileRadar,
@@ -70,6 +72,7 @@ class DashboardState extends Equatable {
     bool? isGpsFixValid,
     int? totalPoisCount,
     Set<PoiType>? enabledPoiTypes,
+    bool? isHudMirrorMode,
   }) {
     return DashboardState(
       currentSpeedKmh: currentSpeedKmh ?? this.currentSpeedKmh,
@@ -81,6 +84,7 @@ class DashboardState extends Equatable {
       isGpsFixValid: isGpsFixValid ?? this.isGpsFixValid,
       totalPoisCount: totalPoisCount ?? this.totalPoisCount,
       enabledPoiTypes: enabledPoiTypes ?? this.enabledPoiTypes,
+      isHudMirrorMode: isHudMirrorMode ?? this.isHudMirrorMode,
     );
   }
 
@@ -95,6 +99,7 @@ class DashboardState extends Equatable {
         isGpsFixValid,
         totalPoisCount,
         enabledPoiTypes,
+        isHudMirrorMode,
       ];
 }
 
@@ -217,6 +222,16 @@ class DashboardCubit extends Cubit<DashboardState> {
       updated.remove(type);
     }
     emit(state.copyWith(enabledPoiTypes: updated));
+  }
+
+  /// Alterna o modo espelho HUD (projeção no para-brisa em condução noturna).
+  void toggleHudMirrorMode() {
+    emit(state.copyWith(isHudMirrorMode: !state.isHudMirrorMode));
+  }
+
+  /// Define explicitamente o modo espelho HUD.
+  void setHudMirrorMode(bool enabled) {
+    emit(state.copyWith(isHudMirrorMode: enabled));
   }
 
   /// Define contagem inicial de POIs na base para exibição de métricas.

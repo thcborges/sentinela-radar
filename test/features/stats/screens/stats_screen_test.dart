@@ -129,5 +129,43 @@ void main() {
 
       verify(() => mockStatsCubit.clearHistory()).called(1);
     });
+
+    testWidgets('deve renderizar card de pedágios e taxas individuais quando houver custos de pedágio', (tester) async {
+      final passages = [
+        PassageRecord(
+          id: 1,
+          poiId: 101,
+          poiType: PoiType.freeFlowToll,
+          vehicleSpeedKmh: 90,
+          timestamp: DateTime(2026, 10, 30, 10, 0),
+          isOverSpeed: false,
+          roadName: 'SP-099 Free Flow',
+          tollFee: 4.20,
+        ),
+      ];
+
+      when(() => mockStatsCubit.state).thenReturn(
+        StatsState(
+          isLoading: false,
+          summary: const StatsSummary(totalPassages: 1, overSpeedPassages: 0, totalTollCost: 4.20),
+          recentPassages: passages,
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: BlocProvider<StatsCubit>.value(
+            value: mockStatsCubit,
+            child: const StatsScreen(),
+          ),
+        ),
+      );
+
+      expect(find.byKey(const Key('stats_toll_card')), findsOneWidget);
+      expect(find.text('Pedágios & Free Flow Estimados'), findsOneWidget);
+      expect(find.text('R\$ 4,20'), findsOneWidget);
+      expect(find.text('Tarifa: R\$ 4,20'), findsOneWidget);
+    });
   });
 }

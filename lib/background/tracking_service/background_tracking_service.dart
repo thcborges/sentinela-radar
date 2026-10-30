@@ -4,6 +4,7 @@ import '../../core/engine/adaptive_gps_sampler.dart';
 import '../../core/engine/alert_machine.dart';
 import '../../core/models/poi_model.dart';
 import '../../core/platform/live_activity_service.dart';
+import '../../core/toll/toll_rate_estimator.dart';
 import '../../data/repository/poi_repository.dart';
 import '../../features/overlay/services/overlay_service.dart';
 import '../../features/stats/models/passage_record.dart';
@@ -22,6 +23,7 @@ class BackgroundTrackingService {
   final PassageRepository? _passageRepository;
   final AdaptiveGpsSampler? _adaptiveSampler;
   final LiveActivityService? _liveActivityService;
+  final TollRateEstimator? _tollEstimator;
 
   bool isVoiceEnabled;
   bool isBeepEnabled;
@@ -43,6 +45,7 @@ class BackgroundTrackingService {
     PassageRepository? passageRepository,
     AdaptiveGpsSampler? adaptiveSampler,
     LiveActivityService? liveActivityService,
+    TollRateEstimator? tollEstimator,
     this.isVoiceEnabled = true,
     this.isBeepEnabled = true,
     Set<PoiType>? enabledPoiTypes,
@@ -53,12 +56,14 @@ class BackgroundTrackingService {
         _passageRepository = passageRepository,
         _adaptiveSampler = adaptiveSampler,
         _liveActivityService = liveActivityService,
+        _tollEstimator = tollEstimator,
         enabledPoiTypes = enabledPoiTypes ?? Set.from(PoiType.values);
 
   bool get isRunning => _isRunning;
   ActiveAlert? get currentAlert => _currentAlert;
   VehiclePosition? get lastPosition => _lastPosition;
   AdaptiveGpsSampler? get adaptiveSampler => _adaptiveSampler;
+  TollRateEstimator? get tollEstimator => _tollEstimator;
 
   Stream<ActiveAlert?> get alertStream => _alertController.stream;
   Stream<VehiclePosition> get positionStream => _positionController.stream;
@@ -110,6 +115,11 @@ class BackgroundTrackingService {
             _alertMachine.state.status == AlertStatus.passed);
 
     if (hasPassedPoint) {
+      final tollFee = (previousAlert.poi.type == PoiType.tollBooth ||
+              previousAlert.poi.type == PoiType.freeFlowToll)
+          ? (_tollEstimator ?? const TollRateEstimator()).estimateToll(previousAlert.poi)
+          : null;
+
       _passageRepository?.insertPassage(PassageRecord(
         poiId: previousAlert.poi.id,
         poiType: previousAlert.poi.type,
@@ -118,6 +128,7 @@ class BackgroundTrackingService {
         timestamp: position.timestamp,
         isOverSpeed: previousAlert.isOverSpeed,
         roadName: previousAlert.poi.roadName,
+        tollFee: tollFee,
       ));
     }
 
