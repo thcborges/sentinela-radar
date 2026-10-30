@@ -30,6 +30,16 @@ class PassageRepository {
     } catch (_) {
       // Coluna já existe
     }
+    try {
+      _db.execute('ALTER TABLE passages ADD COLUMN lat REAL;');
+    } catch (_) {
+      // Coluna já existe
+    }
+    try {
+      _db.execute('ALTER TABLE passages ADD COLUMN lon REAL;');
+    } catch (_) {
+      // Coluna já existe
+    }
     _db.execute('''
       CREATE INDEX IF NOT EXISTS idx_passages_timestamp ON passages(timestamp DESC);
     ''');
@@ -39,8 +49,8 @@ class PassageRepository {
   Future<int> insertPassage(PassageRecord record) async {
     final stmt = _db.prepare('''
       INSERT INTO passages (
-        poi_id, poi_type, vehicle_speed, speed_limit, timestamp, is_over_speed, road_name, toll_fee
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+        poi_id, poi_type, vehicle_speed, speed_limit, timestamp, is_over_speed, road_name, toll_fee, lat, lon
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     ''');
 
     stmt.execute([
@@ -52,6 +62,8 @@ class PassageRepository {
       record.isOverSpeed ? 1 : 0,
       record.roadName,
       record.tollFee,
+      record.latitude,
+      record.longitude,
     ]);
 
     stmt.close();
@@ -61,7 +73,7 @@ class PassageRepository {
   /// Recupera as passagens mais recentes limitadas por [limit].
   Future<List<PassageRecord>> getRecentPassages({int limit = 20}) async {
     final stmt = _db.prepare('''
-      SELECT id, poi_id, poi_type, vehicle_speed, speed_limit, timestamp, is_over_speed, road_name, toll_fee
+      SELECT id, poi_id, poi_type, vehicle_speed, speed_limit, timestamp, is_over_speed, road_name, toll_fee, lat, lon
       FROM passages
       ORDER BY id DESC
       LIMIT ?;
@@ -79,6 +91,8 @@ class PassageRepository {
         isOverSpeed: (row['is_over_speed'] as int) == 1,
         roadName: (row['road_name'] as String?) ?? '',
         tollFee: (row['toll_fee'] as num?)?.toDouble(),
+        latitude: (row['lat'] as num?)?.toDouble(),
+        longitude: (row['lon'] as num?)?.toDouble(),
       );
     }).toList();
 

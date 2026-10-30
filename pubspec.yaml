@@ -21,6 +21,7 @@ dependencies:
   flutter_tts: ^4.2.5
   wakelock_plus_platform_interface: ^1.7.0
   connectivity_plus_platform_interface: ^2.1.0
+  crypto: ^3.0.6
 
 dev_dependencies:
   flutter_test:

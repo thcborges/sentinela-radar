@@ -6,6 +6,7 @@ import 'package:sentinela/core/audio/audio_alert_player.dart';
 import 'package:sentinela/core/engine/adaptive_gps_sampler.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
 import 'package:sentinela/core/engine/alert_preferences.dart';
+import 'package:sentinela/core/engine/section_control_machine.dart';
 import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/core/platform/live_activity_service.dart';
 import 'package:sentinela/data/repository/poi_repository.dart';
@@ -542,6 +543,62 @@ void main() {
       expect(liveService.isActive, isFalse);
 
       await serviceWithLive.dispose();
+      await gpsController.close();
+    });
+
+    test('deve repassar posições de GPS e resetar SectionControlMachine quando configurado', () async {
+      final corridor = AverageSpeedCorridor.fromCoordinates(
+        id: 'c1',
+        name: 'Trecho Radial Leste',
+        speedLimitKmh: 70,
+        entryLatitude: -23.54,
+        entryLongitude: -46.62,
+        entryBearing: 90.0,
+        exitLatitude: -23.54,
+        exitLongitude: -46.60,
+        exitBearing: 90.0,
+      );
+      final sectionMachine = SectionControlMachine(corridors: [corridor]);
+      final serviceWithSection = BackgroundTrackingService(
+        repository: mockRepository,
+        alertMachine: mockAlertMachine,
+        audioPlayer: mockAudioPlayer,
+        overlayService: mockOverlayService,
+        sectionControlMachine: sectionMachine,
+      );
+
+      final gpsController = StreamController<VehiclePosition>.broadcast();
+      when(() => mockAlertMachine.state).thenReturn(const AlertState(status: AlertStatus.idle));
+      when(() => mockAlertMachine.updatePosition(any(), any())).thenReturn(null);
+      when(() => mockOverlayService.updateOverlayData(
+        speedKmh: any(named: 'speedKmh'),
+        alert: any(named: 'alert'),
+      )).thenAnswer((_) async {});
+
+      await serviceWithSection.startTracking(gpsController.stream);
+
+      when(() => mockRepository.findNearbyPois(
+        latitude: any(named: 'latitude'),
+        longitude: any(named: 'longitude'),
+        radiusMeters: any(named: 'radiusMeters'),
+      )).thenAnswer((_) async => []);
+
+      gpsController.add(VehiclePosition(
+        latitude: -23.5401,
+        longitude: -46.6200,
+        speedKmh: 70.0,
+        bearing: 90.0,
+        accuracyMeters: 5.0,
+        timestamp: DateTime(2026, 10, 30, 10, 0, 0),
+      ));
+      await pumpEventQueue();
+
+      expect(sectionMachine.state.isActive, isTrue);
+
+      await serviceWithSection.stopTracking();
+      expect(sectionMachine.state.isActive, isFalse);
+
+      await serviceWithSection.dispose();
       await gpsController.close();
     });
   });

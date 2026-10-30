@@ -72,3 +72,17 @@ stateDiagram-v2
     OVER_SPEED --> PASSED: Ponto ultrapassado
     PASSED --> IDLE: Retorno à rota sem alertas
 ```
+
+---
+
+## 6. Fiscalização por Velocidade Média (Radar de Trecho / Section Control)
+
+Em trechos monitorados por velocidade média, a autuação não depende da velocidade pontual no radar, mas do tempo total decorrido na travessia entre o **Pórtico A (Entrada)** e o **Pórtico B (Saída)**:
+
+1. **Ativação por Azimute de Entrada:** O trecho é ativado quando o veículo ingressa no raio de detecção ($\le 80\text{ m}$) do Pórtico A com rumo compatível ($\Delta\theta \le 35^\circ$).
+2. **Cálculo da Velocidade Média em Tempo Real:**
+   $$v_{media} = \frac{\Delta s}{\Delta t} \cdot 3.6 \quad [\text{km/h}]$$
+3. **Tempo Alvo Restante para Regularização ($t_{alvo}$):**
+   Caso a velocidade média instantânea supere o limite regulamentado da via ($v_{limite}$), o Sentinela projeta quantos segundos o condutor precisa gastar no trecho remanescente para normalizar a média antes de cruzar o Pórtico B:
+   $$t_{alvo} = \max\left(0,\, \frac{S_{total}}{v_{limite} / 3.6} - \Delta t\right) \quad [\text{s}]$$
+4. **Desarme por Desvio ou Timeout:** Caso o condutor saia da rodovia ou estacione por mais de 30 minutos ($> 1.800\text{ s}$), o trecho é automaticamente desarmado sem falso-positivo.

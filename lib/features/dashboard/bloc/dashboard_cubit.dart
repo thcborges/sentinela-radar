@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
+import 'package:sentinela/core/engine/section_control_machine.dart';
 import 'package:sentinela/core/geo/bearing.dart';
 import 'package:sentinela/core/geo/haversine.dart';
 import 'package:sentinela/core/models/poi_model.dart';
@@ -37,6 +38,7 @@ class DashboardState extends Equatable {
   final int totalPoisCount;
   final Set<PoiType> enabledPoiTypes;
   final bool isHudMirrorMode;
+  final SectionControlState sectionControlState;
 
   const DashboardState({
     this.currentSpeedKmh = 0.0,
@@ -48,6 +50,7 @@ class DashboardState extends Equatable {
     this.isGpsFixValid = false,
     this.totalPoisCount = 0,
     this.isHudMirrorMode = false,
+    this.sectionControlState = const SectionControlState(),
     this.enabledPoiTypes = const {
       PoiType.fixedRadar,
       PoiType.mobileRadar,
@@ -73,6 +76,7 @@ class DashboardState extends Equatable {
     int? totalPoisCount,
     Set<PoiType>? enabledPoiTypes,
     bool? isHudMirrorMode,
+    SectionControlState? sectionControlState,
   }) {
     return DashboardState(
       currentSpeedKmh: currentSpeedKmh ?? this.currentSpeedKmh,
@@ -85,6 +89,7 @@ class DashboardState extends Equatable {
       totalPoisCount: totalPoisCount ?? this.totalPoisCount,
       enabledPoiTypes: enabledPoiTypes ?? this.enabledPoiTypes,
       isHudMirrorMode: isHudMirrorMode ?? this.isHudMirrorMode,
+      sectionControlState: sectionControlState ?? this.sectionControlState,
     );
   }
 
@@ -100,6 +105,7 @@ class DashboardState extends Equatable {
         totalPoisCount,
         enabledPoiTypes,
         isHudMirrorMode,
+        sectionControlState,
       ];
 }
 
@@ -109,17 +115,21 @@ class DashboardCubit extends Cubit<DashboardState> {
   final PoiRepository _repository;
   final AlertMachine _alertMachine;
   final LiveActivityService? _liveActivityService;
+  final SectionControlMachine? _sectionControlMachine;
 
   DashboardCubit({
     required PoiRepository repository,
     required AlertMachine alertMachine,
     LiveActivityService? liveActivityService,
+    SectionControlMachine? sectionControlMachine,
   })  : _repository = repository,
         _alertMachine = alertMachine,
         _liveActivityService = liveActivityService,
+        _sectionControlMachine = sectionControlMachine,
         super(const DashboardState());
 
   AlertMachine get alertMachine => _alertMachine;
+  SectionControlMachine? get sectionControlMachine => _sectionControlMachine;
 
   /// Processa cada coordenada recebida do GPS nativo.
   Future<void> onLocationUpdated(VehiclePosition position) async {
@@ -188,6 +198,10 @@ class DashboardCubit extends Cubit<DashboardState> {
       activeRoad = filteredPois.first.roadName;
     }
 
+    // 6. Atualiza máquina de radar de trecho / velocidade média
+    _sectionControlMachine?.updatePosition(position);
+    final sectionState = _sectionControlMachine?.state ?? state.sectionControlState;
+
     emit(state.copyWith(
       currentSpeedKmh: position.speedKmh,
       currentBearing: position.bearing,
@@ -197,6 +211,7 @@ class DashboardCubit extends Cubit<DashboardState> {
       alertStatus: alertState.status,
       nearbySonarPois: sonarItems,
       isGpsFixValid: true,
+      sectionControlState: sectionState,
     ));
 
     final isAlert = activeAlert != null && alertState.status != AlertStatus.idle;
@@ -237,6 +252,12 @@ class DashboardCubit extends Cubit<DashboardState> {
   /// Define contagem inicial de POIs na base para exibição de métricas.
   void setInitialPoiCount(int count) {
     emit(state.copyWith(totalPoisCount: count));
+  }
+
+  /// Reseta manualmente o monitoramento do radar de trecho ativo.
+  void resetSectionControl() {
+    _sectionControlMachine?.reset();
+    emit(state.copyWith(sectionControlState: const SectionControlState()));
   }
 
   @override
