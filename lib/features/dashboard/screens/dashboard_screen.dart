@@ -179,6 +179,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 8),
+                                  _buildBadges(state),
                                   if (state.sectionControlState.isActive)
                                     _buildSectionControlBanner(state.sectionControlState),
                                   AlertBannerM3(
@@ -241,6 +242,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ],
                             ),
                           ),
+
+                          _buildBadges(state),
 
                           const SizedBox(height: 12),
 
@@ -390,6 +393,71 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBadges(DashboardState state) {
+    if (!state.isTunnelMode && (state.activeCluster == null || !state.activeCluster!.isMultiPoint)) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (state.isTunnelMode)
+          Container(
+            key: const Key('dashboard_tunnel_badge'),
+            margin: const EdgeInsets.only(top: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: SentinelaTheme.alertWarning.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: SentinelaTheme.alertWarning, width: 1),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.tune_rounded, size: 14, color: SentinelaTheme.alertWarning),
+                SizedBox(width: 6),
+                Text(
+                  'TÚNEL / NAVEGAÇÃO INERCIAL',
+                  style: TextStyle(
+                    color: SentinelaTheme.alertWarning,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (state.activeCluster != null && state.activeCluster!.isMultiPoint)
+          Container(
+            key: const Key('dashboard_cluster_badge'),
+            margin: const EdgeInsets.only(top: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: SentinelaTheme.primaryGold.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: SentinelaTheme.primaryGold, width: 1),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.layers_rounded, size: 13, color: SentinelaTheme.primaryGold),
+                const SizedBox(width: 6),
+                Text(
+                  '+${state.activeCluster!.associatedPois.length} fiscalização colocalizada',
+                  style: const TextStyle(
+                    color: SentinelaTheme.primaryGold,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 

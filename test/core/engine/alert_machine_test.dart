@@ -1,5 +1,6 @@
 import 'package:sentinela/core/engine/alert_machine.dart';
 import 'package:sentinela/core/models/poi_model.dart';
+import 'package:sentinela/core/models/vehicle_profile.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -289,6 +290,39 @@ void main() {
       expect(alertMachine.state.nearbyAlerts[0].poi.id, equals(10));
       expect(alertMachine.state.nearbyAlerts[1].poi.id, equals(20));
       expect(alertMachine.state.nearbyAlerts[2].poi.id, equals(30));
+    });
+
+    test('deve aplicar perfil veicular CTB (veículo pesado limitado a 90 km/h em rodovia)', () {
+      final highwayRadar = const PoiPoint(
+        id: 99,
+        type: PoiType.fixedRadar,
+        latitude: 0.002,
+        longitude: 0.0,
+        speedLimit: 110, // Limite para leves na rodovia
+      );
+
+      // Veículo a 95 km/h
+      final pos = VehiclePosition(
+        latitude: 0.0,
+        longitude: 0.0,
+        speedKmh: 95.0,
+        bearing: 0.0,
+        accuracyMeters: 5.0,
+        timestamp: DateTime.now(),
+      );
+
+      // 1. Carro a 95 km/h em via de 110 km/h: alerta normal (sem excesso)
+      alertMachine.updateVehicleProfile(VehicleProfile.car());
+      alertMachine.updatePosition(pos, [highwayRadar]);
+      expect(alertMachine.state.status, equals(AlertStatus.alerting));
+      expect(alertMachine.state.activeAlert!.isOverSpeed, isFalse);
+
+      // 2. Caminhão / Veículo Pesado a 95 km/h: limite legal CTB é 90 km/h -> excesso de velocidade!
+      alertMachine.updateVehicleProfile(VehicleProfile.heavy());
+      alertMachine.updatePosition(pos, [highwayRadar]);
+      expect(alertMachine.state.status, equals(AlertStatus.overSpeed));
+      expect(alertMachine.state.activeAlert!.isOverSpeed, isTrue);
+      expect(alertMachine.state.activeAlert!.poi.speedLimit, equals(90));
     });
   });
 }

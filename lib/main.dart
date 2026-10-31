@@ -4,6 +4,8 @@ import 'package:sqlite3/sqlite3.dart';
 import 'package:sentinela/core/backup/backup_restore_service.dart';
 import 'package:sentinela/core/diagnostics/system_diagnostics.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
+import 'package:sentinela/core/engine/poi_cluster_engine.dart';
+import 'package:sentinela/core/geo/dead_reckoning_engine.dart';
 import 'package:sentinela/core/hardware/wakelock_manager.dart';
 import 'package:sentinela/core/location/geolocator_location_service.dart';
 import 'package:sentinela/core/location/location_service_interface.dart';
@@ -144,11 +146,16 @@ class _SentinelaAppState extends State<SentinelaApp> {
       connectivityChecker: widget.connectivityChecker ?? PlatformConnectivityChecker(),
     );
 
+    final drEngine = DeadReckoningEngine();
+    const clusterEngine = PoiClusterEngine();
+
     _dashboardCubit = DashboardCubit(
       repository: _repository,
       alertMachine: _alertMachine,
       liveActivityService: _liveActivityService,
       customPoiRepository: customPoiRepo,
+      deadReckoningEngine: drEngine,
+      poiClusterEngine: clusterEngine,
     );
   }
 
