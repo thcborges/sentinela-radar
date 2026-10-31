@@ -138,3 +138,26 @@ Para máxima legibilidade diurna e proteção contra ofuscamento noturno e em t�
    - `darkOnly`: Tema escuro analítico contínuo (#121212).
    - `dayHighContrast`: Alto contraste para condução sob sol forte no para-brisa.
    - `solarAutomatic`: Chaveamento automático dia/noite pelo zênite solar oficial ($90^\circ 50'$ civil), com ativação imediata de superfície escura ao transitar por túneis.
+
+---
+
+## 11. Acessibilidade Universal (a11y), Semantics & Feedback Háptico Tátil
+
+Para assegurar inclusão total a motoristas com deficiência visual ou auditiva, bem como maximizar a usabilidade em condições adversas de condução (alta incidência de luz solar ou trepidação veicular):
+
+1. **Motor de Feedback Háptico Veicular (`HapticFeedbackEngine`):**
+   - **5 Padrões Táteis Especializados:** `click` (interações da interface), `gentleNotice` (lombadas físicas e pedágios), `radarWarning` (aproximação preventiva a radares), `criticalOverSpeed` (pulsação vigorosa para excesso de velocidade) e `successConfirmation` (ultrapassagem de POI ou reporte rápido).
+   - **Intensidades Configuráveis:** 4 níveis (`off`, `light`, `medium`, `strong`).
+   - **Debounce de Segurança:** Limita repetições táteis de excesso de velocidade (intervalo padrão de 1.400 ms) para evitar fadiga do atuador e manter o motorista focado na via.
+   - **Execução Desacoplada e Não-Bloqueante (`unawaited`):** Platform channels nativos de vibração rodam sem pausar ou atrasar os cálculos matemáticos do GPS ou as animações a 60/120 fps.
+
+2. **Acessibilidade Semântica no Cockpit (Material Design 3):**
+   - **Velocímetro Analítico:** Anotações semânticas (`Semantics`) com labels dinâmicos e valores tabulares de velocidade instantânea, limite da via e alerta de excesso.
+   - **Sonar Radar M3:** Descrição acessível com contagem em tempo real das fiscalizações no cone frontal.
+   - **Banner de Alerta:** Configurado como região ao vivo (`liveRegion: true`) para leitura imediata pelos leitores de tela do Android (TalkBack) e iOS (VoiceOver).
+   - **Modo Alto Contraste:** Cores reforçadas e contornos com bordas acentuadas (`#FFFFFF` e `#000000`) para máxima legibilidade contra ofuscamento solar.
+
+3. **Internacionalização Completa (i18n):**
+   - Suporte multilíngue de primeira classe para Português (`pt`), Inglês (`en`) e Espanhol (`es`).
+   - Dicionários semânticos nativos para todos os tipos de POIs e terminologia do cockpit.
+   - Locução de áudio veicular TTS traduzida contextualmente (`TTSAlertFormatter`), permitindo condução assistida para usuários e turistas no Brasil e no exterior.

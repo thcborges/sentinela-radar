@@ -17,7 +17,10 @@ class SonarRadarM3 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return Semantics(
+      label: 'Sonar frontal de radar',
+      value: '${items.length} pontos detectados à frente no radar',
+      child: Card(
       color: SentinelaTheme.surfaceContainerDark,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
@@ -89,7 +92,8 @@ class SonarRadarM3 extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }
 

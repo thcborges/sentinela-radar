@@ -5,8 +5,10 @@ import 'package:sentinela/core/engine/poi_cluster_engine.dart';
 import 'package:sentinela/core/engine/section_control_machine.dart';
 import 'package:sentinela/core/geo/dead_reckoning_engine.dart';
 import 'package:sentinela/core/geo/solar_calculator.dart';
+import 'package:sentinela/core/l10n/app_language.dart';
 import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/core/models/vehicle_profile.dart';
+import 'package:sentinela/core/platform/haptic_feedback_engine.dart';
 import 'package:sentinela/core/platform/live_activity_service.dart';
 import 'package:sentinela/data/repository/custom_poi_repository.dart';
 import 'package:sentinela/data/repository/poi_repository.dart';
@@ -17,6 +19,8 @@ class MockPoiRepository extends Mock implements PoiRepository {}
 class MockAlertMachine extends Mock implements AlertMachine {}
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late MockPoiRepository mockRepo;
   late MockAlertMachine mockAlertMachine;
   late DashboardCubit cubit;
@@ -428,6 +432,18 @@ void main() {
       expect(cubitWithClusters.state.activeCluster!.primaryPoi.id, equals(111));
 
       await cubitWithClusters.close();
+    });
+
+    test('deve atualizar parâmetros de acessibilidade, idioma e feedback háptico', () {
+      cubit.setHapticFeedback(enabled: false, intensity: HapticIntensity.strong);
+      expect(cubit.state.hapticEnabled, isFalse);
+      expect(cubit.state.hapticIntensity, HapticIntensity.strong);
+
+      cubit.setLanguage(AppLanguage.es);
+      expect(cubit.state.language, AppLanguage.es);
+
+      cubit.setHighContrastMode(true);
+      expect(cubit.state.highContrastMode, isTrue);
     });
   });
 }

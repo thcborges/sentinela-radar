@@ -1,4 +1,6 @@
 import 'package:equatable/equatable.dart';
+import '../l10n/app_language.dart';
+import '../platform/haptic_feedback_engine.dart';
 
 /// Preferências e tolerâncias customizáveis para parametrização do motor de alertas do Sentinela.
 class AlertPreferences extends Equatable {
@@ -8,6 +10,10 @@ class AlertPreferences extends Equatable {
   final double anticipationTimeSeconds;
   final bool soundEnabled;
   final bool voiceEnabled;
+  final bool hapticEnabled;
+  final HapticIntensity hapticIntensity;
+  final AppLanguage language;
+  final bool highContrastMode;
 
   const AlertPreferences({
     this.speedTolerancePercent = 0.0,
@@ -16,6 +22,10 @@ class AlertPreferences extends Equatable {
     this.anticipationTimeSeconds = 15.0,
     this.soundEnabled = true,
     this.voiceEnabled = true,
+    this.hapticEnabled = true,
+    this.hapticIntensity = HapticIntensity.medium,
+    this.language = AppLanguage.pt,
+    this.highContrastMode = false,
   });
 
   /// Determina se [currentSpeedKmh] excede o [speedLimit] considerando tolerâncias absolutas e percentuais.
@@ -34,6 +44,10 @@ class AlertPreferences extends Equatable {
     double? anticipationTimeSeconds,
     bool? soundEnabled,
     bool? voiceEnabled,
+    bool? hapticEnabled,
+    HapticIntensity? hapticIntensity,
+    AppLanguage? language,
+    bool? highContrastMode,
   }) {
     return AlertPreferences(
       speedTolerancePercent:
@@ -44,6 +58,10 @@ class AlertPreferences extends Equatable {
           anticipationTimeSeconds ?? this.anticipationTimeSeconds,
       soundEnabled: soundEnabled ?? this.soundEnabled,
       voiceEnabled: voiceEnabled ?? this.voiceEnabled,
+      hapticEnabled: hapticEnabled ?? this.hapticEnabled,
+      hapticIntensity: hapticIntensity ?? this.hapticIntensity,
+      language: language ?? this.language,
+      highContrastMode: highContrastMode ?? this.highContrastMode,
     );
   }
 
@@ -55,10 +73,30 @@ class AlertPreferences extends Equatable {
       'anticipationTimeSeconds': anticipationTimeSeconds,
       'soundEnabled': soundEnabled,
       'voiceEnabled': voiceEnabled,
+      'hapticEnabled': hapticEnabled,
+      'hapticIntensity': hapticIntensity.name,
+      'language': language.name,
+      'highContrastMode': highContrastMode,
     };
   }
 
   factory AlertPreferences.fromJson(Map<String, dynamic> json) {
+    HapticIntensity parseHaptic(dynamic val) {
+      if (val is String) {
+        for (final item in HapticIntensity.values) {
+          if (item.name == val) return item;
+        }
+      }
+      return HapticIntensity.medium;
+    }
+
+    AppLanguage parseLang(dynamic val) {
+      if (val is String) {
+        return AppLanguage.fromCode(val);
+      }
+      return AppLanguage.pt;
+    }
+
     return AlertPreferences(
       speedTolerancePercent:
           (json['speedTolerancePercent'] as num?)?.toDouble() ?? 0.0,
@@ -69,6 +107,10 @@ class AlertPreferences extends Equatable {
           (json['anticipationTimeSeconds'] as num?)?.toDouble() ?? 15.0,
       soundEnabled: json['soundEnabled'] as bool? ?? true,
       voiceEnabled: json['voiceEnabled'] as bool? ?? true,
+      hapticEnabled: json['hapticEnabled'] as bool? ?? true,
+      hapticIntensity: parseHaptic(json['hapticIntensity']),
+      language: parseLang(json['language']),
+      highContrastMode: json['highContrastMode'] as bool? ?? false,
     );
   }
 
@@ -80,5 +122,9 @@ class AlertPreferences extends Equatable {
         anticipationTimeSeconds,
         soundEnabled,
         voiceEnabled,
+        hapticEnabled,
+        hapticIntensity,
+        language,
+        highContrastMode,
       ];
 }
