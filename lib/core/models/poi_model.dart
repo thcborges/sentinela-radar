@@ -51,6 +51,16 @@ enum PoiType {
     return PoiType.fixedRadar;
   }
 
+  /// Retorna o enum a partir do nome em string ou fallback para [fixedRadar].
+  static PoiType fromName(String name) {
+    for (final type in PoiType.values) {
+      if (type.name == name) {
+        return type;
+      }
+    }
+    return PoiType.fixedRadar;
+  }
+
   /// Nome descritivo da categoria.
   String get displayName => label;
 

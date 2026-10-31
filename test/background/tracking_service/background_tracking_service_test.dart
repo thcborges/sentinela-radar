@@ -4,6 +4,9 @@ import 'package:mocktail/mocktail.dart';
 import 'package:sentinela/background/tracking_service/background_tracking_service.dart';
 import 'package:sentinela/core/audio/audio_alert_player.dart';
 import 'package:sentinela/core/engine/adaptive_gps_sampler.dart';
+import 'package:sentinela/core/automotive/automotive_service.dart';
+import 'package:sentinela/core/automotive/car_app_models.dart';
+import 'package:sentinela/core/automotive/car_app_platform_interface.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
 import 'package:sentinela/core/engine/alert_preferences.dart';
 import 'package:sentinela/core/engine/section_control_machine.dart';
@@ -599,6 +602,53 @@ void main() {
       expect(sectionMachine.state.isActive, isFalse);
 
       await serviceWithSection.dispose();
+      await gpsController.close();
+    });
+
+    test('deve repassar alertas e velocidade para AutomotiveService quando conectado ao carro', () async {
+      final fakePlatform = FakeCarAppPlatform();
+      final automotiveService = AutomotiveService(platform: fakePlatform);
+      fakePlatform.setSimulatedConnectionStatus(CarConnectionStatus.connectedAndroidAuto);
+      await pumpEventQueue();
+
+      final serviceWithAuto = BackgroundTrackingService(
+        repository: mockRepository,
+        alertMachine: mockAlertMachine,
+        audioPlayer: mockAudioPlayer,
+        overlayService: mockOverlayService,
+        automotiveService: automotiveService,
+      );
+
+      final gpsController = StreamController<VehiclePosition>.broadcast();
+      when(() => mockAlertMachine.state).thenReturn(const AlertState(status: AlertStatus.alerting));
+      when(() => mockAlertMachine.updatePosition(any(), any())).thenReturn(null);
+      when(() => mockRepository.findNearbyPois(
+        latitude: any(named: 'latitude'),
+        longitude: any(named: 'longitude'),
+        radiusMeters: any(named: 'radiusMeters'),
+      )).thenAnswer((_) async => []);
+
+      await serviceWithAuto.startTracking(gpsController.stream);
+
+      gpsController.add(VehiclePosition(
+        latitude: -23.5505,
+        longitude: -46.6333,
+        speedKmh: 95.0,
+        bearing: 45.0,
+        accuracyMeters: 4.0,
+        timestamp: DateTime(2026, 10, 31, 10, 0, 0),
+      ));
+      await pumpEventQueue();
+
+      expect(serviceWithAuto.automotiveService, isNotNull);
+      expect(fakePlatform.isSessionActive, isTrue);
+      expect(fakePlatform.lastData, isNotNull);
+      expect(fakePlatform.lastData!.currentSpeedKmh, 95.0);
+      expect(fakePlatform.lastData!.distractionLevel, CarDistractionLevel.highSpeed);
+
+      await serviceWithAuto.stopTracking();
+      await serviceWithAuto.dispose();
+      automotiveService.dispose();
       await gpsController.close();
     });
   });

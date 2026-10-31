@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sentinela/core/automotive/automotive_service.dart';
+import 'package:sentinela/core/automotive/car_app_models.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
 import 'package:sentinela/core/engine/poi_cluster_engine.dart';
 import 'package:sentinela/core/engine/section_control_machine.dart';
@@ -59,6 +61,7 @@ class DashboardState extends Equatable {
   final HapticIntensity hapticIntensity;
   final AppLanguage language;
   final bool highContrastMode;
+  final CarConnectionStatus carConnectionStatus;
 
   const DashboardState({
     this.currentSpeedKmh = 0.0,
@@ -82,6 +85,7 @@ class DashboardState extends Equatable {
     this.hapticIntensity = HapticIntensity.medium,
     this.language = AppLanguage.pt,
     this.highContrastMode = false,
+    this.carConnectionStatus = CarConnectionStatus.disconnected,
     this.enabledPoiTypes = const {
       PoiType.fixedRadar,
       PoiType.mobileRadar,
@@ -129,6 +133,7 @@ class DashboardState extends Equatable {
     HapticIntensity? hapticIntensity,
     AppLanguage? language,
     bool? highContrastMode,
+    CarConnectionStatus? carConnectionStatus,
   }) {
     return DashboardState(
       currentSpeedKmh: currentSpeedKmh ?? this.currentSpeedKmh,
@@ -153,6 +158,7 @@ class DashboardState extends Equatable {
       hapticIntensity: hapticIntensity ?? this.hapticIntensity,
       language: language ?? this.language,
       highContrastMode: highContrastMode ?? this.highContrastMode,
+      carConnectionStatus: carConnectionStatus ?? this.carConnectionStatus,
     );
   }
 
@@ -180,6 +186,7 @@ class DashboardState extends Equatable {
         hapticIntensity,
         language,
         highContrastMode,
+        carConnectionStatus,
       ];
 }
 
@@ -194,6 +201,7 @@ class DashboardCubit extends Cubit<DashboardState> {
   final DeadReckoningEngine? _deadReckoningEngine;
   final PoiClusterEngine? _poiClusterEngine;
   final HapticFeedbackEngine _hapticEngine;
+  final AutomotiveService? _automotiveService;
 
   DashboardCubit({
     required PoiRepository repository,
@@ -204,6 +212,7 @@ class DashboardCubit extends Cubit<DashboardState> {
     DeadReckoningEngine? deadReckoningEngine,
     PoiClusterEngine? poiClusterEngine,
     HapticFeedbackEngine? hapticEngine,
+    AutomotiveService? automotiveService,
   })  : _repository = repository,
         _alertMachine = alertMachine,
         _liveActivityService = liveActivityService,
@@ -212,7 +221,31 @@ class DashboardCubit extends Cubit<DashboardState> {
         _deadReckoningEngine = deadReckoningEngine,
         _poiClusterEngine = poiClusterEngine,
         _hapticEngine = hapticEngine ?? HapticFeedbackEngine(),
-        super(const DashboardState());
+        _automotiveService = automotiveService,
+        super(const DashboardState()) {
+    _automotiveService?.onCarAction = (action) async {
+      switch (action) {
+        case CarAction.quickReportRadar:
+          await reportQuickPoi(type: PoiType.mobileRadar);
+          break;
+        case CarAction.quickReportSpeedBump:
+          await reportQuickPoi(type: PoiType.physicalSpeedBump);
+          break;
+        case CarAction.toggleMute:
+          final prefs = _alertMachine.preferences;
+          _alertMachine.updatePreferences(
+            prefs.copyWith(voiceEnabled: !prefs.voiceEnabled),
+          );
+          break;
+        case CarAction.toggleHudTheme:
+          toggleHudMirrorMode();
+          break;
+        case CarAction.dismissAlert:
+          _alertMachine.reset();
+          break;
+      }
+    };
+  }
 
   AlertMachine get alertMachine => _alertMachine;
   SectionControlMachine? get sectionControlMachine => _sectionControlMachine;
@@ -220,6 +253,7 @@ class DashboardCubit extends Cubit<DashboardState> {
   DeadReckoningEngine? get deadReckoningEngine => _deadReckoningEngine;
   PoiClusterEngine? get poiClusterEngine => _poiClusterEngine;
   HapticFeedbackEngine get hapticEngine => _hapticEngine;
+  AutomotiveService? get automotiveService => _automotiveService;
 
   /// Atualiza preferências táteis de feedback háptico.
   void setHapticFeedback({bool? enabled, HapticIntensity? intensity}) {
@@ -414,6 +448,24 @@ class DashboardCubit extends Cubit<DashboardState> {
         isAlertActive: isAlert,
       ),
     );
+
+    final carSonar = sonarItems.map((s) => CarSonarItem(
+      label: s.poi.type.label,
+      distanceMeters: s.distanceMeters,
+      relativeAngleDeg: s.relativeAngleDeg,
+      poiType: s.poi.type,
+      isCritical: activeAlert?.poi.id == s.poi.id && alertState.status == AlertStatus.overSpeed,
+    )).toList();
+
+    await _automotiveService?.updateWithPosition(
+      position: position,
+      roadName: activeRoad,
+      activeAlert: activeAlert,
+      alertStatus: alertState.status,
+      sonarItems: carSonar,
+      isNightMode: state.isEffectiveThemeDark,
+      isMuted: !_alertMachine.preferences.voiceEnabled,
+    );
   }
 
   /// Alterna ativação de uma categoria de POI específica (ex: silenciar lombadas).
@@ -491,6 +543,7 @@ class DashboardCubit extends Cubit<DashboardState> {
   @override
   Future<void> close() async {
     await _liveActivityService?.stopActivity();
+    _automotiveService?.dispose();
     return super.close();
   }
 }

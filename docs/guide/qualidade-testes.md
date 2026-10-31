@@ -28,6 +28,7 @@ A estabilidade e precisão do **Sentinela** são garantidas por uma política in
 | `core/backup/` (`BackupRestoreService` 100% Offline) | 48 / 48 | **100.0%** | ✅ Aprovado |
 | `core/diagnostics/` (`SystemDiagnosticsService`) | 32 / 32 | **100.0%** | ✅ Aprovado |
 | `core/audio/` (`AudioAlertPlayer`, `PlatformTtsEngine`, `ToneGenerator`, Formatter multilíngue) | 115 / 126 | **91.3%** | ✅ Aprovado |
+| `core/automotive/` (`AutomotiveService`, `CarAppData`, `CarAppPlatformInterface`, Driver Distraction) | 200 / 204 | **98.0%** | ✅ Aprovado |
 | `core/toll/` (`TollRateEstimator` e tarifas Free Flow) | 21 / 21 | **100.0%** | ✅ Aprovado |
 | `core/location/` (`GeolocatorLocationService`) | 26 / 27 | **96.3%** | ✅ Aprovado |
 | `core/hardware/` (`PlatformWakelockManager`) | 9 / 9 | **100.0%** | ✅ Aprovado |
@@ -41,7 +42,7 @@ A estabilidade e precisão do **Sentinela** são garantidas por uma política in
 | `features/stats/` (`PassageRepository`, `StatsCubit`, `StatsScreen`, Export GPX/KML) | 262 / 266 | **98.5%** | ✅ Aprovado |
 | `background/` (`BackgroundTrackingService`) | 74 / 77 | **96.1%** | ✅ Aprovado |
 | `main.dart` & `overlayMain` | 71 / 75 | **94.7%** | ✅ Aprovado |
-| **Total Consolidado** | **3171 / 3273 linhas** | **96.88%** | ✅ Aprovado (351 testes) |
+| **Total Consolidado** | **3372 / 3520 linhas** | **95.80%** | ✅ Aprovado (371 testes) |
 
 ---
 

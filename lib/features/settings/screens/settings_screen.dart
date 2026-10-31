@@ -823,6 +823,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
           ),
+
+          const SizedBox(height: 24),
+
+          // 7. Seção de Integração Automotiva
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Text(
+              'Integração Automotiva (Android Auto & Apple CarPlay)',
+              style: TextStyle(
+                color: Color(0xFFB0B0B0),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          Card(
+            color: SentinelaTheme.surfaceContainerDark,
+            child: Column(
+              children: [
+                ListTile(
+                  key: const Key('settings_car_app_status_tile'),
+                  leading: const Icon(Icons.directions_car_rounded, color: SentinelaTheme.alertInfo),
+                  title: const Text('Status da Central Multimídia'),
+                  subtitle: const Text('Exibição de alertas e sonar no painel do veículo'),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF262626),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'Pronto / Ativo',
+                      style: TextStyle(color: SentinelaTheme.alertNormal, fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
