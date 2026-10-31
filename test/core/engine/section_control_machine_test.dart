@@ -213,5 +213,48 @@ void main() {
       machine.reset();
       expect(machine.state.isActive, isFalse);
     });
+
+    test('BUG #36 REGRESSÃO: jitter de GPS (< 3m) em velocidade zero não deve incrementar distância percorrida no trecho', () {
+      final t0 = DateTime(2026, 10, 30, 10, 0, 0);
+
+      // Entrada no trecho
+      machine.updatePosition(VehiclePosition(
+        latitude: -23.5002,
+        longitude: -46.6000,
+        speedKmh: 60.0,
+        bearing: 0.0,
+        accuracyMeters: 5.0,
+        timestamp: t0,
+      ));
+      expect(machine.state.isActive, isTrue);
+
+      // Condutor para no congestionamento (v = 0 km/h) após 500m
+      final t1 = t0.add(const Duration(seconds: 20));
+      machine.updatePosition(VehiclePosition(
+        latitude: -23.4955,
+        longitude: -46.6000,
+        speedKmh: 0.0,
+        bearing: 0.0,
+        accuracyMeters: 5.0,
+        timestamp: t1,
+      ));
+
+      final initialDistance = machine.state.distanceCoveredMeters;
+
+      // 5 coordenadas consecutivas com jitter de ~1m e velocidade 0 km/h
+      for (var i = 1; i <= 5; i++) {
+        machine.updatePosition(VehiclePosition(
+          latitude: -23.4955 + (0.000008 * (i % 2 == 0 ? 1 : -1)),
+          longitude: -46.6000 + (0.000008 * (i % 3 == 0 ? 1 : -1)),
+          speedKmh: 0.0,
+          bearing: 0.0,
+          accuracyMeters: 5.0,
+          timestamp: t1.add(Duration(seconds: i)),
+        ));
+      }
+
+      // Distância percorrida não deve ter sofrido deslocamento fantasma
+      expect(machine.state.distanceCoveredMeters, equals(initialDistance));
+    });
   });
 }
