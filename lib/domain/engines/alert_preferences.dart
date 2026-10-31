@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import 'package:sentinela/core/l10n/app_language.dart';
+import '../l10n/app_language.dart';
 import 'package:sentinela/core/platform/haptic_feedback_engine.dart';
 
 /// Preferências e tolerâncias customizáveis para parametrização do motor de alertas do Sentinela.

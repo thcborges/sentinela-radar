@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import 'package:sentinela/core/audio/tts_alert_formatter.dart';
+import '../audio/tts_alert_formatter.dart';
 import '../math/haversine.dart';
 import '../models/poi_model.dart';
 
