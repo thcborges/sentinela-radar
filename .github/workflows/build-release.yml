@@ -29,11 +29,38 @@ jobs:
       - name: Instalar Dependências
         run: flutter pub get
 
-      - name: Build Release APK
+      - name: Validação Estática e Testes Herméticos
+        run: |
+          flutter analyze --fatal-infos
+          flutter test --coverage
+
+      - name: Build Android App Bundle (Google Play)
+        run: flutter build appbundle --release
+
+      - name: Build Android Release Split APKs
         run: flutter build apk --release --split-per-abi
 
-      - name: Upload Artifacts
+      - name: Gerar Checksums SHA-256 dos Binários
+        run: |
+          mkdir -p build/release-checksums
+          cd build/app/outputs
+          find bundle flutter-apk -type f \( -name "*.aab" -o -name "*.apk" \) -exec sha256sum {} + > ../../release-checksums/SHA256SUMS.txt
+          cd ../..
+
+      - name: Upload Release App Bundle
         uses: actions/upload-artifact@v4
         with:
-          name: release-apks
+          name: sentinela-release-bundle
+          path: build/app/outputs/bundle/release/*.aab
+
+      - name: Upload Release Split APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentinela-release-apks
           path: build/app/outputs/flutter-apk/*.apk
+
+      - name: Upload Checksums SHA-256
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentinela-release-checksums
+          path: build/release-checksums/SHA256SUMS.txt
