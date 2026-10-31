@@ -253,6 +253,11 @@ class SectionControlMachine {
       return null;
     }
 
+    // Dead-band geodésico: descarta ruído estocástico de GPS (< 3m) com veículo em repouso (< 2 km/h)
+    if (position.speedKmh < 2.0 && distDelta < 3.0) {
+      distDelta = 0.0;
+    }
+
     final totalDist = _state.distanceCoveredMeters + distDelta;
     final avgSpeedKmh = (totalDist / elapsedSec) * 3.6;
     final isOverSpeed = avgSpeedKmh > (corridor.speedLimitKmh + speedToleranceKmh);
@@ -286,7 +291,7 @@ class SectionControlMachine {
     }
 
     _state = _state.copyWith(
-      lastPosition: position,
+      lastPosition: distDelta > 0.0 ? position : _state.lastPosition,
       distanceCoveredMeters: totalDist,
       elapsedSeconds: elapsedSec,
       averageSpeedKmh: avgSpeedKmh,
