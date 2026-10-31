@@ -33,8 +33,8 @@ android {
         release {
             // Signing with debug keys for local verification; overridden by CI secrets in production
             signingConfig = signingConfigs.getByName("debug")
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
