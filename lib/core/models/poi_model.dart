@@ -103,6 +103,38 @@ class PoiPoint extends Equatable {
     this.source,
   });
 
+  PoiPoint copyWith({
+    int? id,
+    PoiType? type,
+    double? latitude,
+    double? longitude,
+    int? speedLimit,
+    int? direction,
+    double? toleranceAngle,
+    String? roadName,
+    double? tollFeeCar,
+    String? operator,
+    String? city,
+    String? state,
+    String? source,
+  }) {
+    return PoiPoint(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      speedLimit: speedLimit ?? this.speedLimit,
+      direction: direction ?? this.direction,
+      toleranceAngle: toleranceAngle ?? this.toleranceAngle,
+      roadName: roadName ?? this.roadName,
+      tollFeeCar: tollFeeCar ?? this.tollFeeCar,
+      operator: operator ?? this.operator,
+      city: city ?? this.city,
+      state: state ?? this.state,
+      source: source ?? this.source,
+    );
+  }
+
   @override
   List<Object?> get props => [
         id,

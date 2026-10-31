@@ -5,6 +5,7 @@ import '../geo/bearing.dart';
 import '../geo/haversine.dart';
 import '../models/alert_distance_calculator.dart';
 import '../models/poi_model.dart';
+import '../models/vehicle_profile.dart';
 
 /// Ciclo de estados reativos do motor de alerta.
 enum AlertStatus {
@@ -85,14 +86,23 @@ class AlertState extends Equatable {
 /// filtragem geométrica e priorização de alertas de radares, semáforos e pedágios.
 class AlertMachine extends Cubit<AlertState> {
   AlertPreferences preferences;
+  VehicleProfile vehicleProfile;
 
-  AlertMachine({AlertPreferences? preferences})
-      : preferences = preferences ?? const AlertPreferences(),
+  AlertMachine({
+    AlertPreferences? preferences,
+    VehicleProfile? vehicleProfile,
+  })  : preferences = preferences ?? const AlertPreferences(),
+        vehicleProfile = vehicleProfile ?? VehicleProfile.car(),
         super(AlertState.idle());
 
   /// Atualiza as preferências e tolerâncias do motor de alertas.
   void updatePreferences(AlertPreferences newPreferences) {
     preferences = newPreferences;
+  }
+
+  /// Atualiza o perfil veicular (CTB) ativo no motor de alertas.
+  void updateVehicleProfile(VehicleProfile newProfile) {
+    vehicleProfile = newProfile;
   }
 
   /// Força o retorno imediato ao estado IDLE.
@@ -103,10 +113,11 @@ class AlertMachine extends Cubit<AlertState> {
   /// Processa a posição atual do veículo [position] confrontando-a com os [candidatePois].
   void updatePosition(
     VehiclePosition position,
-    List<PoiPoint> candidatePois,
-  ) {
-    // 1. Descarte de sinais de baixa precisão (incerteza > 35m)
-    if (!position.isAccurate) {
+    List<PoiPoint> candidatePois, {
+    bool isDeadReckoning = false,
+  }) {
+    // 1. Descarte de sinais de baixa precisão (incerteza > 35m, exceto em Dead Reckoning inercial)
+    if (!position.isAccurate && !isDeadReckoning) {
       return;
     }
 
@@ -125,18 +136,22 @@ class AlertMachine extends Cubit<AlertState> {
         poi.longitude,
       );
 
+      final effectiveSpeedLimit = poi.speedLimit != null
+          ? vehicleProfile.resolveSpeedLimit(poi.speedLimit!)
+          : null;
+
       final alertDistance = AlertDistanceCalculator.calculateAlertDistance(
         poi.type,
         position.speedKmh,
-        customAnticipationSeconds: preferences.anticipationTimeSeconds,
-      );
+        customAnticipationSeconds: preferences.anticipationTimeSeconds * vehicleProfile.lookaheadMultiplier,
+      ) * vehicleProfile.lookaheadMultiplier;
 
       final approachingDistance =
           AlertDistanceCalculator.calculateApproachingDistance(
         poi.type,
         position.speedKmh,
-        customAnticipationSeconds: preferences.anticipationTimeSeconds,
-      );
+        customAnticipationSeconds: preferences.anticipationTimeSeconds * vehicleProfile.lookaheadMultiplier,
+      ) * vehicleProfile.lookaheadMultiplier;
 
       // Descarte preliminar por distância
       if (distance > approachingDistance) {
@@ -177,10 +192,10 @@ class AlertMachine extends Cubit<AlertState> {
       );
       final relBearing = bearingDifference(position.bearing, targetBearing);
 
-      // Classificação do estado individual com tolerância customizada
+      // Classificação do estado individual com tolerância customizada e perfil CTB
       final bool isOverSpeed = preferences.isOverSpeed(
         position.speedKmh,
-        poi.speedLimit,
+        effectiveSpeedLimit,
       );
 
       final AlertStatus poiStatus;
@@ -191,8 +206,12 @@ class AlertMachine extends Cubit<AlertState> {
         poiStatus = AlertStatus.approaching;
       }
 
+      final effectivePoi = effectiveSpeedLimit != poi.speedLimit
+          ? poi.copyWith(speedLimit: effectiveSpeedLimit)
+          : poi;
+
       detectedAlerts.add(ActiveAlert(
-        poi: poi,
+        poi: effectivePoi,
         distanceMeters: distance,
         currentSpeedKmh: position.speedKmh,
         status: poiStatus,

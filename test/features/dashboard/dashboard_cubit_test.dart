@@ -1,8 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
+import 'package:sentinela/core/engine/poi_cluster_engine.dart';
 import 'package:sentinela/core/engine/section_control_machine.dart';
+import 'package:sentinela/core/geo/dead_reckoning_engine.dart';
+import 'package:sentinela/core/geo/solar_calculator.dart';
 import 'package:sentinela/core/models/poi_model.dart';
+import 'package:sentinela/core/models/vehicle_profile.dart';
 import 'package:sentinela/core/platform/live_activity_service.dart';
 import 'package:sentinela/data/repository/custom_poi_repository.dart';
 import 'package:sentinela/data/repository/poi_repository.dart';
@@ -307,6 +311,123 @@ void main() {
 
       await cubitWithCustom.close();
       db.close();
+    });
+
+    test('deve atualizar perfil veicular via setVehicleProfile', () {
+      expect(cubit.state.vehicleProfile.type, equals(VehicleType.car));
+
+      cubit.setVehicleProfile(VehicleProfile.heavy());
+
+      expect(cubit.state.vehicleProfile.type, equals(VehicleType.heavy));
+      verify(() => mockAlertMachine.updateVehicleProfile(VehicleProfile.heavy())).called(1);
+    });
+
+    test('deve alternar modo de tema visual via setHudThemeMode e resolver tema efetivo', () {
+      expect(cubit.state.hudThemeMode, equals(HudThemeMode.darkOnly));
+      expect(cubit.state.isEffectiveThemeDark, isTrue);
+
+      cubit.setHudThemeMode(HudThemeMode.dayHighContrast);
+      expect(cubit.state.hudThemeMode, equals(HudThemeMode.dayHighContrast));
+      // Não estando em túnel, modo diurno tem isEffectiveThemeDark = false
+      expect(cubit.state.isEffectiveThemeDark, isFalse);
+    });
+
+    test('deve projetar navegação inercial em túnel via tickDeadReckoning', () async {
+      final drEngine = DeadReckoningEngine();
+      final cubitWithDr = DashboardCubit(
+        repository: mockRepo,
+        alertMachine: mockAlertMachine,
+        deadReckoningEngine: drEngine,
+      );
+
+      when(() => mockRepo.findNearbyPois(
+        latitude: any(named: 'latitude'),
+        longitude: any(named: 'longitude'),
+        radiusMeters: any(named: 'radiusMeters'),
+      )).thenAnswer((_) async => []);
+
+      final t0 = DateTime(2026, 10, 30, 12, 0, 0);
+      final initialPos = VehiclePosition(
+        latitude: -23.5505,
+        longitude: -46.6333,
+        speedKmh: 80.0,
+        bearing: 0.0,
+        accuracyMeters: 5.0,
+        timestamp: t0,
+      );
+
+      await cubitWithDr.onLocationUpdated(initialPos);
+      expect(cubitWithDr.state.deadReckoningStatus, equals(DeadReckoningStatus.gpsLocked));
+      expect(cubitWithDr.state.isTunnelMode, isFalse);
+
+      // Simula 3 segundos sem GPS dentro do túnel
+      final t3 = t0.add(const Duration(seconds: 3));
+      final projected = await cubitWithDr.tickDeadReckoning(t3);
+
+      expect(projected, isNotNull);
+      expect(cubitWithDr.state.deadReckoningStatus, equals(DeadReckoningStatus.deadReckoning));
+      expect(cubitWithDr.state.isTunnelMode, isTrue);
+      // Em túnel, o tema efetivo deve ser forçado para escuro (dark)
+      expect(cubitWithDr.state.isEffectiveThemeDark, isTrue);
+
+      await cubitWithDr.close();
+    });
+
+    test('deve associar activeCluster quando PoiClusterEngine for fornecido e houver alerta ativo', () async {
+      final clusterEngine = const PoiClusterEngine(clusterRadiusMeters: 45.0);
+      final cubitWithClusters = DashboardCubit(
+        repository: mockRepo,
+        alertMachine: mockAlertMachine,
+        poiClusterEngine: clusterEngine,
+      );
+
+      final radar = const PoiPoint(
+        id: 111,
+        type: PoiType.fixedRadar,
+        latitude: -23.5505,
+        longitude: -46.6333,
+        speedLimit: 60,
+      );
+      final bump = const PoiPoint(
+        id: 222,
+        type: PoiType.physicalSpeedBump,
+        latitude: -23.5506,
+        longitude: -46.6333,
+      );
+
+      when(() => mockRepo.findNearbyPois(
+        latitude: any(named: 'latitude'),
+        longitude: any(named: 'longitude'),
+        radiusMeters: any(named: 'radiusMeters'),
+      )).thenAnswer((_) async => [radar, bump]);
+
+      when(() => mockAlertMachine.state).thenReturn(AlertState(
+        status: AlertStatus.alerting,
+        activeAlert: ActiveAlert(
+          poi: radar,
+          distanceMeters: 200,
+          currentSpeedKmh: 50,
+          status: AlertStatus.alerting,
+          isOverSpeed: false,
+          targetBearing: 0.0,
+          relativeBearing: 0.0,
+        ),
+      ));
+
+      await cubitWithClusters.onLocationUpdated(VehiclePosition(
+        latitude: -23.5500,
+        longitude: -46.6333,
+        speedKmh: 50.0,
+        bearing: 0.0,
+        accuracyMeters: 5.0,
+        timestamp: DateTime(2026, 10, 30, 12, 0, 0),
+      ));
+
+      expect(cubitWithClusters.state.activeCluster, isNotNull);
+      expect(cubitWithClusters.state.activeCluster!.isMultiPoint, isTrue);
+      expect(cubitWithClusters.state.activeCluster!.primaryPoi.id, equals(111));
+
+      await cubitWithClusters.close();
     });
   });
 }

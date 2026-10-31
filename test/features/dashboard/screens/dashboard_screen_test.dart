@@ -7,7 +7,9 @@ import 'package:mocktail/mocktail.dart';
 import 'package:sentinela/core/diagnostics/system_diagnostics.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
 import 'package:sentinela/core/engine/alert_preferences.dart';
+import 'package:sentinela/core/engine/poi_cluster_engine.dart';
 import 'package:sentinela/core/engine/section_control_machine.dart';
+import 'package:sentinela/core/geo/dead_reckoning_engine.dart';
 import 'package:sentinela/core/hardware/wakelock_manager.dart';
 import 'package:sentinela/core/location/location_service_interface.dart';
 import 'package:sentinela/core/models/poi_model.dart';
@@ -27,6 +29,7 @@ class MockStatsCubit extends MockCubit<StatsState> implements StatsCubit {}
 class MockWakelockManager extends Mock implements WakelockManager {}
 class MockLocationService extends Mock implements LocationService {}
 class MockSystemDiagnosticsService extends Mock implements SystemDiagnosticsService {}
+class MockDashboardCubit extends MockCubit<DashboardState> implements DashboardCubit {}
 
 void main() {
   late MockPoiRepository mockRepo;
@@ -511,6 +514,66 @@ void main() {
 
       await customCubit.close();
       db.close();
+    });
+
+    testWidgets('deve exibir badge de túnel / dead reckoning quando ativado', (tester) async {
+      final mockCubit = MockDashboardCubit();
+      when(() => mockCubit.state).thenReturn(
+        const DashboardState(
+          isGpsFixValid: true,
+          deadReckoningStatus: DeadReckoningStatus.deadReckoning,
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: BlocProvider<DashboardCubit>.value(
+            value: mockCubit,
+            child: DashboardScreen(syncService: mockSyncService),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byKey(const Key('dashboard_tunnel_badge')), findsOneWidget);
+      expect(find.text('TÚNEL / NAVEGAÇÃO INERCIAL'), findsOneWidget);
+      await mockCubit.close();
+    });
+
+    testWidgets('deve exibir badge de cluster multi-ponto quando houver múltiplos POIs colocalizados', (tester) async {
+      final mockCubit = MockDashboardCubit();
+      final radar = const PoiPoint(id: 1, type: PoiType.fixedRadar, latitude: -23.55, longitude: -46.63);
+      final bump = const PoiPoint(id: 2, type: PoiType.physicalSpeedBump, latitude: -23.5501, longitude: -46.63);
+      final cluster = PoiCluster(
+        primaryPoi: radar,
+        associatedPois: [bump],
+        centerLatitude: -23.55,
+        centerLongitude: -46.63,
+        compositeTtsPhrase: 'Radar e lombada',
+      );
+
+      when(() => mockCubit.state).thenReturn(
+        DashboardState(
+          isGpsFixValid: true,
+          activeCluster: cluster,
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: BlocProvider<DashboardCubit>.value(
+            value: mockCubit,
+            child: DashboardScreen(syncService: mockSyncService),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byKey(const Key('dashboard_cluster_badge')), findsOneWidget);
+      expect(find.text('+1 fiscalização colocalizada'), findsOneWidget);
+      await mockCubit.close();
     });
   });
 }
