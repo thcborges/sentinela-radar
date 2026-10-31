@@ -176,6 +176,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       speedLimit: speedLimit,
                                       alertStatus: state.alertStatus,
                                       isGpsFixValid: state.isGpsFixValid,
+                                      isHighContrast: state.highContrastMode,
                                     ),
                                   ),
                                   const SizedBox(height: 8),
@@ -269,6 +270,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               speedLimit: speedLimit,
                               alertStatus: state.alertStatus,
                               isGpsFixValid: state.isGpsFixValid,
+                              isHighContrast: state.highContrastMode,
                             ),
                           ),
 

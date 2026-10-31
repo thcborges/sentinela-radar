@@ -10,6 +10,7 @@ class SpeedometerM3 extends StatelessWidget {
   final AlertStatus alertStatus;
   final bool isGpsFixValid;
   final double maxSpeed;
+  final bool isHighContrast;
 
   const SpeedometerM3({
     super.key,
@@ -18,11 +19,13 @@ class SpeedometerM3 extends StatelessWidget {
     this.alertStatus = AlertStatus.idle,
     this.isGpsFixValid = true,
     this.maxSpeed = 160.0,
+    this.isHighContrast = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final alertColor = SentinelaTheme.colorForAlertStatus(alertStatus);
+    final trackColor = isHighContrast ? const Color(0xFF444444) : const Color(0xFF222222);
 
     return AspectRatio(
       aspectRatio: 1.0,
@@ -35,8 +38,9 @@ class SpeedometerM3 extends StatelessWidget {
             size: const Size(double.infinity, double.infinity),
             painter: _SpeedometerRingPainter(
               progress: isGpsFixValid ? (speedKmh / maxSpeed).clamp(0.0, 1.0) : 0.0,
-              trackColor: const Color(0xFF222222),
+              trackColor: trackColor,
               activeColor: alertColor,
+              isHighContrast: isHighContrast,
             ),
           ),
 
@@ -60,17 +64,31 @@ class SpeedometerM3 extends StatelessWidget {
                   ),
                 ),
               ] else ...[
-                Text(
-                  speedKmh.round().toString(),
-                  style: SentinelaTheme.speedTextStyle,
-                ),
-                const Text(
-                  'km/h',
-                  style: TextStyle(
-                    color: Color(0xFF8E8E8E),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 2,
+                Semantics(
+                  label: 'Velocímetro',
+                  value: '${speedKmh.round()} km/h',
+                  excludeSemantics: true,
+                  child: Column(
+                    children: [
+                      Text(
+                        speedKmh.round().toString(),
+                        style: isHighContrast
+                            ? SentinelaTheme.speedTextStyle.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                              )
+                            : SentinelaTheme.speedTextStyle,
+                      ),
+                      Text(
+                        'km/h',
+                        style: TextStyle(
+                          color: isHighContrast ? Colors.white70 : const Color(0xFF8E8E8E),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -79,32 +97,37 @@ class SpeedometerM3 extends StatelessWidget {
 
               // Placa de limite de velocidade da via (Sinalização R-19 Brasileira)
               if (speedLimit != null)
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: const Color(0xFFD32F2F),
-                      width: 4.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.4),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
+                Semantics(
+                  label: 'Velocidade máxima permitida',
+                  value: '$speedLimit km/h',
+                  excludeSemantics: true,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFFD32F2F),
+                        width: isHighContrast ? 5.5 : 4.5,
                       ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    speedLimit.toString(),
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      speedLimit.toString(),
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                      ),
                     ),
                   ),
                 ),
@@ -121,18 +144,20 @@ class _SpeedometerRingPainter extends CustomPainter {
   final double progress;
   final Color trackColor;
   final Color activeColor;
+  final bool isHighContrast;
 
   _SpeedometerRingPainter({
     required this.progress,
     required this.trackColor,
     required this.activeColor,
+    this.isHighContrast = false,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (size.width / 2) - 16;
-    const strokeWidth = 14.0;
+    final strokeWidth = isHighContrast ? 17.0 : 14.0;
 
     // Arco de 240 graus centralizado na parte superior (de 150° a 390°)
     const startAngle = 150.0 * (math.pi / 180.0);
@@ -174,6 +199,7 @@ class _SpeedometerRingPainter extends CustomPainter {
   bool shouldRepaint(covariant _SpeedometerRingPainter oldDelegate) {
     return oldDelegate.progress != progress ||
         oldDelegate.activeColor != activeColor ||
-        oldDelegate.trackColor != trackColor;
+        oldDelegate.trackColor != trackColor ||
+        oldDelegate.isHighContrast != isHighContrast;
   }
 }

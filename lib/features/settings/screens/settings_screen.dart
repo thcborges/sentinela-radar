@@ -4,8 +4,10 @@ import 'package:sentinela/core/backup/backup_restore_service.dart';
 import 'package:sentinela/core/engine/alert_preferences.dart';
 import 'package:sentinela/core/geo/solar_calculator.dart';
 import 'package:sentinela/core/hardware/wakelock_manager.dart';
+import 'package:sentinela/core/l10n/app_language.dart';
 import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/core/models/vehicle_profile.dart';
+import 'package:sentinela/core/platform/haptic_feedback_engine.dart';
 import 'package:sentinela/core/theme/sentinela_theme.dart';
 import 'package:sentinela/data/sync/poi_sync_service.dart';
 import 'package:sentinela/features/dashboard/bloc/dashboard_cubit.dart';
@@ -69,6 +71,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   VehicleType _selectedVehicleType = VehicleType.car;
   HudThemeMode _selectedThemeMode = HudThemeMode.darkOnly;
 
+  // Acessibilidade (a11y), Idioma (i18n) & Háptico
+  bool _hapticEnabled = true;
+  HapticIntensity _hapticIntensity = HapticIntensity.medium;
+  AppLanguage _selectedLanguage = AppLanguage.pt;
+  bool _highContrastMode = false;
+
   @override
   void initState() {
     super.initState();
@@ -78,12 +86,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _anticipationSeconds = _preferences.anticipationTimeSeconds;
     _audioVoiceTts = _preferences.voiceEnabled;
     _audioBeeps = _preferences.soundEnabled;
+    _hapticEnabled = _preferences.hapticEnabled;
+    _hapticIntensity = _preferences.hapticIntensity;
+    _selectedLanguage = _preferences.language;
+    _highContrastMode = _preferences.highContrastMode;
 
     try {
       final cubitState = widget.dashboardCubit?.state;
       if (cubitState != null) {
         _selectedVehicleType = cubitState.vehicleProfile.type;
         _selectedThemeMode = cubitState.hudThemeMode;
+        _hapticEnabled = cubitState.hapticEnabled;
+        _hapticIntensity = cubitState.hapticIntensity;
+        _selectedLanguage = cubitState.language;
+        _highContrastMode = cubitState.highContrastMode;
       }
     } catch (_) {}
 
@@ -108,9 +124,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       anticipationTimeSeconds: _anticipationSeconds,
       soundEnabled: _audioBeeps,
       voiceEnabled: _audioVoiceTts,
+      hapticEnabled: _hapticEnabled,
+      hapticIntensity: _hapticIntensity,
+      language: _selectedLanguage,
+      highContrastMode: _highContrastMode,
     );
     _preferences = newPrefs;
     widget.dashboardCubit?.alertMachine.updatePreferences(newPrefs);
+    widget.dashboardCubit?.setHapticFeedback(
+      enabled: _hapticEnabled,
+      intensity: _hapticIntensity,
+    );
+    widget.dashboardCubit?.setLanguage(_selectedLanguage);
+    widget.dashboardCubit?.setHighContrastMode(_highContrastMode);
   }
 
   Future<void> _exportBackup() async {
@@ -632,6 +658,139 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Seção Acessibilidade (a11y), Idioma (i18n) & Feedback Háptico
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Text(
+              'Acessibilidade, Idioma & Feedback Tátil',
+              style: TextStyle(
+                color: Color(0xFFB0B0B0),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          Card(
+            color: SentinelaTheme.surfaceContainerDark,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Seletor de Idioma
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Idioma da Interface & Avisos de Voz',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: SegmentedButton<AppLanguage>(
+                          key: const Key('settings_language_segmented'),
+                          segments: const [
+                            ButtonSegment(
+                              value: AppLanguage.pt,
+                              label: Text('Português'),
+                            ),
+                            ButtonSegment(
+                              value: AppLanguage.en,
+                              label: Text('English'),
+                            ),
+                            ButtonSegment(
+                              value: AppLanguage.es,
+                              label: Text('Español'),
+                            ),
+                          ],
+                          selected: {_selectedLanguage},
+                          onSelectionChanged: (set) {
+                            final chosen = set.first;
+                            setState(() => _selectedLanguage = chosen);
+                            _updatePreferences();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: Color(0xFF262626)),
+
+                // Feedback Háptico (Vibração)
+                SwitchListTile(
+                  key: const Key('settings_haptic_switch'),
+                  title: const Text('Feedback Háptico Tátil'),
+                  subtitle: const Text('Pulsos de vibração em aproximação e alertas de excesso de velocidade'),
+                  value: _hapticEnabled,
+                  onChanged: (val) {
+                    setState(() => _hapticEnabled = val);
+                    _updatePreferences();
+                  },
+                ),
+
+                if (_hapticEnabled) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Intensidade da Vibração',
+                          style: TextStyle(color: Color(0xFF8E8E8E), fontSize: 12),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: SegmentedButton<HapticIntensity>(
+                            key: const Key('settings_haptic_intensity_segmented'),
+                            segments: const [
+                              ButtonSegment(
+                                value: HapticIntensity.light,
+                                label: Text('Suave'),
+                              ),
+                              ButtonSegment(
+                                value: HapticIntensity.medium,
+                                label: Text('Média'),
+                              ),
+                              ButtonSegment(
+                                value: HapticIntensity.strong,
+                                label: Text('Forte'),
+                              ),
+                            ],
+                            selected: {_hapticIntensity},
+                            onSelectionChanged: (set) {
+                              final chosen = set.first;
+                              setState(() => _hapticIntensity = chosen);
+                              _updatePreferences();
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                const Divider(height: 1, color: Color(0xFF262626)),
+
+                // Modo de Alto Contraste
+                SwitchListTile(
+                  key: const Key('settings_high_contrast_switch'),
+                  title: const Text('Modo Alto Contraste'),
+                  subtitle: const Text('Contraste reforçado e bordas vivas para visibilidade sob luz solar intensa'),
+                  value: _highContrastMode,
+                  onChanged: (val) {
+                    setState(() => _highContrastMode = val);
+                    _updatePreferences();
+                  },
+                ),
+              ],
             ),
           ),
 
