@@ -65,6 +65,28 @@
 
 ---
 
+### 2.3. Protocolo Mandatório de Refatoração Segura em Camadas
+
+> [!IMPORTANT]
+> **Padrão Obrigatório de Engenharia para Separação de Camadas:**
+> A separação e refatoração arquitetural do projeto deve ocorrer estritamente sem alteração de comportamento externo ou quebra de contratos públicos.
+
+1. **Mapeamento do Projeto:** Listar cada função, componente e trecho do código e classificá-lo estritamente em uma destas 3 camadas:
+   * **a. UI:** O que aparece na tela e captura eventos/interações do usuário (Widgets, Telas, Painéis, Miniaturas, Banners, Modais de Diálogo).
+   * **b. Regra de Negócio:** Cálculos matemáticos, validações, máquinas de estados, tomadas de decisão e modelos de domínio puro (Haversine, Bearing, AlertMachine, SectionControl, Haptics, Clusters, etc.).
+   * **c. Acesso a Dados e Serviços Externos:** Persistência em banco (SQLite R*Tree), APIs, serviços de plataforma/SO nativos (GPS, Wakelock, TTS, Bluetooth, Áudio, Canais Nativos).
+2. **Diagnóstico de Acoplamento:** Apontar dependências cruzadas, código duplicado e estado global que dificultem ou impeçam a separação limpa entre camadas.
+3. **Proposta de Estrutura:** Propor a nova estrutura de pastas e arquivos seguindo o padrão nativo já adotado no projeto. **Zero novas bibliotecas ou frameworks externos.**
+4. **Plano de Passos Pequenos e Atômicos:** O plano deve ser fatiado em micro-etapas. Cada passo move um único pedaço isolado, mantém os mesmos nomes públicos/props e preserva o app 100% funcional.
+5. **Testes de Caracterização Prévios:** Antes do primeiro passo, auditar a suíte de testes existente. Se algum fluxo principal do arquivo alvo não estiver coberto, escrever **testes de caracterização** (que registram o comportamento atual exato, mesmo que pareça imperfeito ou com bugs) para blindar contra regressões.
+6. **Execução Passo a Passo com Validação:** Executar rigorosamente um passo por vez, rodando a suíte de testes (`flutter test`) ao final de cada alteração.
+7. **Regras Inquebráveis de Refatoração:**
+   * **Não corrigir bugs nem alterar regras de negócio** durante a refatoração. Caso um bug seja identificado, deve ser anotado em uma lista separada para tratamento futuro via ciclo de TDD com teste de regressão.
+   * **Não renomear rotas, propriedades públicas (props), chaves de parâmetros ou nomes de colunas do banco de dados.**
+   * **Aprovação Obrigatória:** Apresentar o plano detalhado de passos e aguardar expressamente o "OK" do usuário antes de iniciar o Passo 1.
+
+---
+
 ## 3. Arquitetura do Sistema e Stack Tecnológica
 
 O projeto é estruturado em **Flutter (Dart)** com foco em separação estrita de camadas e desacoplamento para viabilizar cobertura de testes ≥ 90%:
