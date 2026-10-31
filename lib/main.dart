@@ -12,6 +12,7 @@ import 'package:sentinela/core/platform/live_activity_service.dart';
 import 'package:sentinela/core/theme/sentinela_theme.dart';
 import 'package:sentinela/data/database/database_manager.dart';
 import 'package:sentinela/data/database/seed_database_loader.dart';
+import 'package:sentinela/data/repository/custom_poi_repository.dart';
 import 'package:sentinela/data/repository/poi_repository.dart';
 import 'package:sentinela/data/sync/poi_sync_service.dart';
 import 'package:sentinela/features/dashboard/bloc/dashboard_cubit.dart';
@@ -113,7 +114,10 @@ class _SentinelaAppState extends State<SentinelaApp> {
     _dbManager = DatabaseManager(_rawDb);
     _dbManager.initializeSchema();
 
-    _repository = PoiRepository(_dbManager);
+    final customPoiRepo = CustomPoiRepository(_rawDb);
+    customPoiRepo.initializeSchema();
+
+    _repository = PoiRepository(_dbManager, customPoiRepository: customPoiRepo);
     _alertMachine = AlertMachine();
     _syncService = PoiSyncService(
       _rawDb,
@@ -144,6 +148,7 @@ class _SentinelaAppState extends State<SentinelaApp> {
       repository: _repository,
       alertMachine: _alertMachine,
       liveActivityService: _liveActivityService,
+      customPoiRepository: customPoiRepo,
     );
   }
 

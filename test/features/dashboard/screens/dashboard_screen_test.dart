@@ -12,11 +12,13 @@ import 'package:sentinela/core/hardware/wakelock_manager.dart';
 import 'package:sentinela/core/location/location_service_interface.dart';
 import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/core/theme/sentinela_theme.dart';
+import 'package:sentinela/data/repository/custom_poi_repository.dart';
 import 'package:sentinela/data/repository/poi_repository.dart';
 import 'package:sentinela/data/sync/poi_sync_service.dart';
 import 'package:sentinela/features/dashboard/bloc/dashboard_cubit.dart';
 import 'package:sentinela/features/dashboard/screens/dashboard_screen.dart';
 import 'package:sentinela/features/stats/bloc/stats_cubit.dart';
+import 'package:sqlite3/sqlite3.dart';
 
 class MockPoiRepository extends Mock implements PoiRepository {}
 class MockAlertMachine extends Mock implements AlertMachine {}
@@ -454,6 +456,61 @@ void main() {
       expect(find.text('Aguarde 15s'), findsOneWidget);
 
       await cubit.close();
+    });
+
+    testWidgets('deve abrir modal de marcação rápida ao tocar no FAB e registrar ponto', (tester) async {
+      final db = sqlite3.openInMemory();
+      final customRepo = CustomPoiRepository(db);
+      customRepo.initializeSchema();
+
+      final customCubit = DashboardCubit(
+        repository: mockRepo,
+        alertMachine: mockAlertMachine,
+        customPoiRepository: customRepo,
+      );
+
+      when(() => mockRepo.findNearbyPois(
+        latitude: any(named: 'latitude'),
+        longitude: any(named: 'longitude'),
+        radiusMeters: any(named: 'radiusMeters'),
+      )).thenAnswer((_) async => []);
+
+      final testPos = VehiclePosition(
+        latitude: -23.5505,
+        longitude: -46.6333,
+        speedKmh: 60,
+        bearing: 90,
+        accuracyMeters: 5,
+        timestamp: DateTime(2026, 10, 30, 12, 0),
+      );
+      await customCubit.onLocationUpdated(testPos);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: BlocProvider<DashboardCubit>.value(
+            value: customCubit,
+            child: DashboardScreen(syncService: mockSyncService),
+          ),
+        ),
+      );
+
+      expect(find.byKey(const Key('dashboard_quick_report_fab')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('dashboard_quick_report_fab')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Marcar Ponto na Via'), findsOneWidget);
+      expect(find.byKey(const Key('quick_report_mobile_radar')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('quick_report_mobile_radar')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('quick_report_success_snackbar')), findsOneWidget);
+      expect(customCubit.state.userPoiCount, 1);
+
+      await customCubit.close();
+      db.close();
     });
   });
 }

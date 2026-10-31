@@ -166,5 +166,27 @@ void main() {
       );
       expect(find.byIcon(Icons.local_police_rounded), findsOneWidget);
     });
+
+    testWidgets('deve renderizar botão de marcação rápida e disparar onQuickReport quando fornecido', (tester) async {
+      bool quickReported = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: Scaffold(
+            body: FloatingOverlayWidget(
+              currentSpeedKmh: 50.0,
+              onQuickReport: () => quickReported = true,
+            ),
+          ),
+        ),
+      );
+
+      final button = find.byKey(const Key('overlay_quick_report_button'));
+      expect(button, findsOneWidget);
+
+      await tester.tap(button);
+      expect(quickReported, isTrue);
+    });
   });
 }
