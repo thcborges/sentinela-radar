@@ -83,7 +83,7 @@ class SonarRadarM3 extends StatelessWidget {
               child: CustomPaint(
                 key: const Key('sonar_radar_canvas'),
                 size: const Size(double.infinity, double.infinity),
-                painter: _SonarCanvasPainter(
+                painter: SonarCanvasPainter(
                   items: items,
                   maxRangeMeters: maxRangeMeters,
                 ),
@@ -98,14 +98,43 @@ class SonarRadarM3 extends StatelessWidget {
 }
 
 /// CustomPainter para renderizar o sonar em arco semi-circular e os POIs mapeados.
-class _SonarCanvasPainter extends CustomPainter {
+class SonarCanvasPainter extends CustomPainter {
   final List<SonarPoiItem> items;
   final double maxRangeMeters;
 
-  _SonarCanvasPainter({
+  SonarCanvasPainter({
     required this.items,
     required this.maxRangeMeters,
   });
+
+  /// Alcance máximo efetivo: adapta-se dinamicamente caso existam pontos remotos além de [maxRangeMeters].
+  double get effectiveMaxRange {
+    if (items.isEmpty) return maxRangeMeters;
+    final maxItemDist = items.map((e) => e.distanceMeters).reduce(math.max);
+    return math.max(maxRangeMeters, maxItemDist);
+  }
+
+  /// Retorna o raio radial proporcional (em pixels) para o item de POI com distinção de profundidade.
+  double computeRadialDistance(SonarPoiItem item, double maxRadius) {
+    final effectiveMax = effectiveMaxRange;
+    final ratio = (item.distanceMeters / effectiveMax).clamp(0.05, 1.0);
+    return maxRadius * ratio;
+  }
+
+  /// Retorna a coordenada cartesiana (Offset) do centro do POI no Canvas.
+  Offset computePoiPosition(SonarPoiItem item, Size size) {
+    final origin = Offset(size.width / 2, size.height - 12);
+    final maxRadius = math.min(size.width / 2 - 12, size.height - 24);
+    if (maxRadius <= 0) return origin;
+
+    final r = computeRadialDistance(item, maxRadius);
+    final rad = (item.relativeAngleDeg - 90.0) * (math.pi / 180.0);
+
+    return Offset(
+      origin.dx + r * math.cos(rad),
+      origin.dy + r * math.sin(rad),
+    );
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -155,31 +184,27 @@ class _SonarCanvasPainter extends CustomPainter {
 
     canvas.drawPath(vehiclePath, vehiclePaint);
 
-    // 4. Marcadores de POIs mapeados no cone polar
+    // 4. Marcadores de POIs mapeados no cone polar com gradiente visual de profundidade
+    final currentEffectiveMax = effectiveMaxRange;
     for (final item in items) {
-      final ratio = (item.distanceMeters / maxRangeMeters).clamp(0.05, 1.0);
-      final r = maxRadius * ratio;
-      // Ângulo relativo: 0° é frente (topo / -90°), positivo é direita
-      final rad = (item.relativeAngleDeg - 90.0) * (math.pi / 180.0);
-
-      final poiPos = Offset(
-        origin.dx + r * math.cos(rad),
-        origin.dy + r * math.sin(rad),
-      );
-
+      final poiPos = computePoiPosition(item, size);
+      final ratio = (item.distanceMeters / currentEffectiveMax).clamp(0.05, 1.0);
       final Color poiColor = _colorForPoiType(item.poi.type);
+
+      // Gradiente de profundidade visual: pontos remotos têm atenuação sutil de halo e diâmetro
+      final depthFactor = (1.0 - (ratio * 0.35)).clamp(0.55, 1.0);
 
       // Efeito de halo/brilho
       final haloPaint = Paint()
-        ..color = poiColor.withValues(alpha: 0.3)
+        ..color = poiColor.withValues(alpha: 0.3 * depthFactor)
         ..style = PaintingStyle.fill;
-      canvas.drawCircle(poiPos, 8.0, haloPaint);
+      canvas.drawCircle(poiPos, 8.0 * depthFactor, haloPaint);
 
       // Ponto central de alto contraste
       final dotPaint = Paint()
-        ..color = poiColor
+        ..color = poiColor.withValues(alpha: depthFactor)
         ..style = PaintingStyle.fill;
-      canvas.drawCircle(poiPos, 4.0, dotPaint);
+      canvas.drawCircle(poiPos, (4.0 * depthFactor).clamp(2.5, 4.0), dotPaint);
     }
   }
 
@@ -192,7 +217,7 @@ class _SonarCanvasPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _SonarCanvasPainter oldDelegate) {
+  bool shouldRepaint(covariant SonarCanvasPainter oldDelegate) {
     return oldDelegate.items != items ||
         oldDelegate.maxRangeMeters != maxRangeMeters;
   }
