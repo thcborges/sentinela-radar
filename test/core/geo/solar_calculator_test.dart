@@ -79,5 +79,63 @@ void main() {
       );
       expect(isDay, isTrue);
     });
+
+    test('BUG #32 REGRESSÃO: deve identificar noite polar contínua como horário noturno mesmo ao meio-dia', () {
+      // Svalbard (78° N) no solstício de inverno: o sol nunca nasce
+      final svalbardWinterNoon = DateTime(2026, 12, 21, 12, 0, 0);
+      final isDayWinter = SolarCalculator.isDaytime(
+        latitude: 78.0,
+        longitude: 15.0,
+        time: svalbardWinterNoon,
+      );
+      expect(isDayWinter, isFalse, reason: 'Noite polar em Svalbard no solstício de inverno deve ser escuro ao meio-dia');
+
+      // Svalbard em transição (27 de outubro): nascer do sol e pôr do sol discordam, sol não alcança o horizonte
+      final svalbardOctNoon = DateTime(2026, 10, 27, 12, 0, 0);
+      final isDayOct = SolarCalculator.isDaytime(
+        latitude: 78.0,
+        longitude: 15.0,
+        time: svalbardOctNoon,
+      );
+      expect(isDayOct, isFalse, reason: 'Em transição para noite polar onde o sol não passa do horizonte deve ser noturno ao meio-dia');
+
+      // Antártica (-75° S) no inverno austral (21 de junho): solstício de inverno austral
+      final antarcticaWinterNoon = DateTime(2026, 6, 21, 12, 0, 0);
+      final isDayAntarctica = SolarCalculator.isDaytime(
+        latitude: -75.0,
+        longitude: 0.0,
+        time: antarcticaWinterNoon,
+      );
+      expect(isDayAntarctica, isFalse, reason: 'Noite polar na Antártica deve ser noturno ao meio-dia em 21 de junho');
+    });
+
+    test('BUG #32 REGRESSÃO: deve identificar sol da meia-noite / dia polar contínuo como horário diurno à meia-noite', () {
+      // Svalbard (78° N) no solstício de verão (21 de junho) à meia-noite
+      final svalbardMidnight = DateTime(2026, 6, 21, 0, 0, 0);
+      final isDayMidnight = SolarCalculator.isDaytime(
+        latitude: 78.0,
+        longitude: 15.0,
+        time: svalbardMidnight,
+      );
+      expect(isDayMidnight, isTrue, reason: 'Sol da meia-noite em Svalbard deve ser diurno às 00:00');
+    });
+
+    test('deve calcular elevação solar com precisão astronômica em qualquer coordenada', () {
+      // 12:00 local em São Paulo (UTC-3) corresponde a 15:00 UTC (zênite solar próximo)
+      final noonElevation = SolarCalculator.calculateSolarElevation(
+        latitude: spLat,
+        longitude: spLon,
+        time: DateTime.utc(2026, 10, 30, 15, 0, 0),
+      );
+      expect(noonElevation, greaterThan(60.0));
+
+      // 00:30 local em São Paulo (UTC-3) corresponde a 03:30 UTC (escuridão noturna profunda)
+      final midnightElevation = SolarCalculator.calculateSolarElevation(
+        latitude: spLat,
+        longitude: spLon,
+        time: DateTime.utc(2026, 10, 30, 3, 30, 0),
+      );
+      expect(midnightElevation, lessThan(-30.0));
+    });
   });
 }
