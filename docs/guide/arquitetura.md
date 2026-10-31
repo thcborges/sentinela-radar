@@ -4,40 +4,41 @@ A arquitetura do **Sentinela** é fundamentada em separação estrita de camadas
 
 ---
 
-## 🏗️ Visão em Camadas
+## 🏗️ Visão em 3 Camadas Canônicas
+
+O Sentinela adota rigorosamente uma arquitetura em **3 camadas desacopladas** (Clean/Hexagonal Architecture), sem dependências circulares:
 
 ```mermaid
 flowchart TD
-    subgraph UI ["Camada de Apresentação (Material Design 3 Dark HUD)"]
+    subgraph UI ["1. Camada de Apresentação / UI (lib/ui/)"]
         DashboardScreen["DashboardScreen (Velocímetro + Sonar + Alerta)"]
         FloatingOverlayWidget["FloatingOverlayWidget (Miniatura Flutuante)"]
         SettingsScreen["SettingsScreen (Configurações & Atualização)"]
         StatsScreen["StatsScreen (Estatísticas de Condução)"]
+        Theme["SentinelaTheme (M3 Dark HUD)"]
     end
 
-    subgraph State ["Camada de Gerenciamento de Estado (BLoC / Cubit)"]
-        DashboardCubit["DashboardCubit (GPS, Sonar & Alertas)"]
-        StatsCubit["StatsCubit (Estatísticas & Histórico Local)"]
-        AlertMachine["AlertMachine (Máquina de Estados de Alerta)"]
+    subgraph Domain ["2. Camada de Domínio / Regras de Negócio (lib/domain/)"]
+        DashboardCubit["DashboardCubit & StatsCubit (Cubit / BLoC)"]
+        AlertMachine["AlertMachine & SectionControlMachine (FSM)"]
+        GeoMath["GeoMath (Haversine, Bearing, Tolerância)"]
+        DomainModels["Modelos (Poi, Radar, VehiclePosition, TrafficLight)"]
+        AudioRules["Regras de Áudio, Sonar & Pedágio Free Flow"]
     end
 
-    subgraph Background ["Camada de Segundo Plano & Sistema"]
-        BackgroundService["BackgroundTrackingService (Foreground Service)"]
-        AudioPlayer["AudioAlertPlayer (TTS Offline & Bipes Sonar)"]
-        OverlayService["OverlayService (Platform Adapter)"]
-    end
-
-    subgraph Data ["Camada de Dados & Persistência Local"]
-        PoiRepository["PoiRepository (Busca Espacial R*Tree)"]
-        PassageRepository["PassageRepository (Histórico Local)"]
+    subgraph Infra ["3. Camada de Infraestrutura & Serviços Externos (lib/infrastructure/)"]
+        SqliteDb["SQLite Local + Extensão R*Tree"]
+        Repositories["PoiRepository & PassageRepository"]
         SyncService["PoiSyncService (Download & Staging Swap)"]
-        SQLite["SQLite Local + Extensão R*Tree"]
+        HardwareSensors["LocationService, Wakelock, NetworkChecker"]
+        PlatformChannels["Live Activities, Overlay Window, CarApp"]
+        BackgroundService["BackgroundTrackingService (Foreground Service)"]
     end
 
-    UI --> State
-    State --> Background
-    Background --> Data
-    Data --> SQLite
+    UI --> Domain
+    UI --> Infra
+    Domain --> Infra
+    Infra --> SqliteDb
 ```
 
 ---
@@ -47,28 +48,41 @@ flowchart TD
 ```
 sentinela/
 ├── lib/
-│   ├── core/                  # Módulos puros (fórmulas geodésicas, AlertMachine, Hardware/Sensores)
-│   │   ├── audio/             # Gerenciamento de áudio, TTS pt-BR nativo e cadência sonar
-│   │   ├── engine/            # AlertMachine (Máquina de estados finitos reativa)
-│   │   ├── geo/               # Haversine, Bearing e Bounding Box
-│   │   ├── hardware/          # WakelockManager (gestão de tela ativa no painel)
-│   │   ├── location/          # LocationService (GPS nativo e gerenciamento de permissões)
-│   │   ├── models/            # POI, Radar, TrafficLight, VehiclePosition
-│   │   ├── network/           # ConnectivityChecker (detecção de Wi-Fi e dados móveis)
-│   │   └── theme/             # Material Design 3 Dark HUD de alto contraste
-│   ├── data/                  # Persistência e comunicação com dados abertos
-│   │   ├── database/          # SQLite R*Tree nativo pré-compilado
-│   │   ├── repository/        # PoiRepository com Bounding Box
-│   │   └── sync/              # In-App Sync Engine com Staging Swap atômico e validação Wi-Fi
-│   ├── features/              # Apresentação e Telas do Condutor
-│   │   ├── dashboard/         # HUD M3, velocímetro digital monoespaçado e sonar
-│   │   ├── overlay/           # Miniatura flutuante Picture-in-Picture
-│   │   ├── settings/          # Atualização in-app, switches de Wi-Fi e Wakelock
-│   │   └── stats/             # Estatísticas de conformidade e passagens
-│   ├── background/            # Foreground Service e isolamento de ciclo de vida
+│   ├── ui/                    # 1. APRESENTAÇÃO / UI
+│   │   ├── screens/           # Telas completas (Dashboard, Settings, Stats)
+│   │   ├── widgets/           # Componentes M3 puros (Speedometer, Sonar, AlertBanner, FloatingOverlay)
+│   │   └── theme/             # Tema Dark HUD Material Design 3 e paleta de cores
+│   ├── domain/                # 2. DOMÍNIO & REGRAS DE NEGÓCIO PURAS
+│   │   ├── audio/             # Interface e regras acústicas (AudioAlertPlayer)
+│   │   ├── automotive/        # Driver Distraction Guidelines e interface CarApp
+│   │   ├── cubits/            # Gerenciamento de estado reativo (DashboardCubit, StatsCubit)
+│   │   ├── engines/           # AlertMachine, SectionControlMachine, AdaptiveGpsSampler, PoiCluster
+│   │   ├── export/            # Exportação de passagens (CSV, GPX, GeoJSON)
+│   │   ├── l10n/              # Textos e internacionalização pt-BR
+│   │   ├── math/              # Haversine, Bearing e cálculos geodésicos puros
+│   │   ├── models/            # POI, Radar, TrafficLight, VehiclePosition, TollRate
+│   │   ├── release/           # Auditoria de integridade de release e store compliance
+│   │   └── toll/              # Estimativa de pedágio determinística Free Flow
+│   ├── infrastructure/        # 3. ACESSO A DADOS & SERVIÇOS EXTERNOS
+│   │   ├── backup/            # BackupRestoreService (JSON local atômico)
+│   │   ├── background/        # BackgroundTrackingService (Android Foreground Service)
+│   │   ├── database/          # SQLite R*Tree nativo pré-compilado e staging swap
+│   │   ├── diagnostics/       # SystemDiagnosticsService (integridade, bateria, storage)
+│   │   ├── location/          # GeolocatorLocationService (GPS e permissões nativas)
+│   │   ├── platform/          # Adapters nativos: Wakelock, Overlay, LiveActivities, CarApp, TTS, Tone
+│   │   ├── repositories/      # Implementações concretas de repositórios SQLite
+│   │   ├── security/          # DatabaseIntegrityValidator (SHA-256 e PRAGMA integrity_check)
+│   │   └── sync/              # In-App Sync Engine (OSM/CKAN com staging tables)
+│   ├── core/                  # Barrel exports retrocompatíveis (geo, models, engine, theme, etc.)
+│   ├── data/                  # Barrel exports retrocompatíveis (database, repository, sync)
+│   ├── features/              # Barrel exports retrocompatíveis (dashboard, overlay, settings, stats)
+│   ├── background/            # Barrel exports retrocompatíveis (background_service.dart)
 │   └── main.dart              # Ponto de entrada do aplicativo e overlayMain
-└── test/                      # Suíte de testes automatizados BDD/TDD (100% Hermética)
+└── test/                      # Suíte de testes automatizados BDD/TDD (100% Hermética, ≥90% Cobertura)
 ```
+
+> [!NOTE]
+> **Compatibilidade Total via Barrel Exports:** Todos os arquivos históricos em `lib/core/`, `lib/data/`, `lib/features/` e `lib/background/` foram preservados como *barrel exports*, garantindo retrocompatibilidade imediata com 0% de quebra para integrações ou imports pré-existentes.
 
 ---
 
