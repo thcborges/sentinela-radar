@@ -1,11 +1,15 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
+import 'package:sentinela/core/engine/poi_cluster_engine.dart';
 import 'package:sentinela/core/engine/section_control_machine.dart';
 import 'package:sentinela/core/geo/bearing.dart';
+import 'package:sentinela/core/geo/dead_reckoning_engine.dart';
 import 'package:sentinela/core/geo/haversine.dart';
+import 'package:sentinela/core/geo/solar_calculator.dart';
 import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/core/models/user_reported_poi.dart';
+import 'package:sentinela/core/models/vehicle_profile.dart';
 import 'package:sentinela/core/platform/live_activity_service.dart';
 import 'package:sentinela/data/repository/custom_poi_repository.dart';
 import 'package:sentinela/data/repository/poi_repository.dart';
@@ -43,6 +47,11 @@ class DashboardState extends Equatable {
   final SectionControlState sectionControlState;
   final VehiclePosition? lastPosition;
   final int userPoiCount;
+  final VehicleProfile vehicleProfile;
+  final DeadReckoningStatus deadReckoningStatus;
+  final HudThemeMode hudThemeMode;
+  final bool isDaytime;
+  final PoiCluster? activeCluster;
 
   const DashboardState({
     this.currentSpeedKmh = 0.0,
@@ -57,6 +66,11 @@ class DashboardState extends Equatable {
     this.sectionControlState = const SectionControlState(),
     this.lastPosition,
     this.userPoiCount = 0,
+    this.vehicleProfile = const VehicleProfile(type: VehicleType.car, name: 'Automóvel / Utilitário'),
+    this.deadReckoningStatus = DeadReckoningStatus.searchingSignal,
+    this.hudThemeMode = HudThemeMode.darkOnly,
+    this.isDaytime = false,
+    this.activeCluster,
     this.enabledPoiTypes = const {
       PoiType.fixedRadar,
       PoiType.mobileRadar,
@@ -69,6 +83,15 @@ class DashboardState extends Equatable {
       PoiType.highwayPatrol,
     },
   });
+
+  /// Indica se a navegação inercial em túnel está ativa no momento.
+  bool get isTunnelMode => deadReckoningStatus == DeadReckoningStatus.deadReckoning;
+
+  /// Resolve dinamicamente se o tema atual a ser renderizado na UI deve ser escuro.
+  bool get isEffectiveThemeDark => hudThemeMode.shouldUseDarkTheme(
+        isDaytime: isDaytime,
+        isTunnel: isTunnelMode,
+      );
 
   DashboardState copyWith({
     double? currentSpeedKmh,
@@ -85,6 +108,12 @@ class DashboardState extends Equatable {
     SectionControlState? sectionControlState,
     VehiclePosition? lastPosition,
     int? userPoiCount,
+    VehicleProfile? vehicleProfile,
+    DeadReckoningStatus? deadReckoningStatus,
+    HudThemeMode? hudThemeMode,
+    bool? isDaytime,
+    PoiCluster? activeCluster,
+    bool clearActiveCluster = false,
   }) {
     return DashboardState(
       currentSpeedKmh: currentSpeedKmh ?? this.currentSpeedKmh,
@@ -100,6 +129,11 @@ class DashboardState extends Equatable {
       sectionControlState: sectionControlState ?? this.sectionControlState,
       lastPosition: lastPosition ?? this.lastPosition,
       userPoiCount: userPoiCount ?? this.userPoiCount,
+      vehicleProfile: vehicleProfile ?? this.vehicleProfile,
+      deadReckoningStatus: deadReckoningStatus ?? this.deadReckoningStatus,
+      hudThemeMode: hudThemeMode ?? this.hudThemeMode,
+      isDaytime: isDaytime ?? this.isDaytime,
+      activeCluster: clearActiveCluster ? null : (activeCluster ?? this.activeCluster),
     );
   }
 
@@ -118,6 +152,11 @@ class DashboardState extends Equatable {
         sectionControlState,
         lastPosition,
         userPoiCount,
+        vehicleProfile,
+        deadReckoningStatus,
+        hudThemeMode,
+        isDaytime,
+        activeCluster,
       ];
 }
 
@@ -129,6 +168,8 @@ class DashboardCubit extends Cubit<DashboardState> {
   final LiveActivityService? _liveActivityService;
   final SectionControlMachine? _sectionControlMachine;
   final CustomPoiRepository? _customPoiRepository;
+  final DeadReckoningEngine? _deadReckoningEngine;
+  final PoiClusterEngine? _poiClusterEngine;
 
   DashboardCubit({
     required PoiRepository repository,
@@ -136,25 +177,76 @@ class DashboardCubit extends Cubit<DashboardState> {
     LiveActivityService? liveActivityService,
     SectionControlMachine? sectionControlMachine,
     CustomPoiRepository? customPoiRepository,
+    DeadReckoningEngine? deadReckoningEngine,
+    PoiClusterEngine? poiClusterEngine,
   })  : _repository = repository,
         _alertMachine = alertMachine,
         _liveActivityService = liveActivityService,
         _sectionControlMachine = sectionControlMachine,
         _customPoiRepository = customPoiRepository,
+        _deadReckoningEngine = deadReckoningEngine,
+        _poiClusterEngine = poiClusterEngine,
         super(const DashboardState());
 
   AlertMachine get alertMachine => _alertMachine;
   SectionControlMachine? get sectionControlMachine => _sectionControlMachine;
   CustomPoiRepository? get customPoiRepository => _customPoiRepository;
+  DeadReckoningEngine? get deadReckoningEngine => _deadReckoningEngine;
+  PoiClusterEngine? get poiClusterEngine => _poiClusterEngine;
 
-  /// Processa cada coordenada recebida do GPS nativo.
-  Future<void> onLocationUpdated(VehiclePosition position) async {
-    if (!position.isAccurate) {
+  /// Atualiza o perfil veicular (CTB) ativo no Dashboard e na máquina de alertas.
+  void setVehicleProfile(VehicleProfile profile) {
+    _alertMachine.updateVehicleProfile(profile);
+    emit(state.copyWith(vehicleProfile: profile));
+  }
+
+  /// Define o modo de tema visual do painel HUD.
+  void setHudThemeMode(HudThemeMode mode) {
+    emit(state.copyWith(hudThemeMode: mode));
+  }
+
+  /// Executa passo de projeção do Dead Reckoning em caso de perda de GPS / túnel.
+  Future<VehiclePosition?> tickDeadReckoning(DateTime now) async {
+    final projected = _deadReckoningEngine?.projectPosition(now);
+    if (projected != null) {
+      await onLocationUpdated(projected, isDeadReckoning: true);
+    } else {
+      emit(state.copyWith(
+        deadReckoningStatus:
+            _deadReckoningEngine?.status ?? DeadReckoningStatus.searchingSignal,
+      ));
+    }
+    return projected;
+  }
+
+  /// Processa cada coordenada recebida do GPS nativo ou extrapolação inercial.
+  Future<void> onLocationUpdated(
+    VehiclePosition position, {
+    bool isDeadReckoning = false,
+  }) async {
+    final isDay = SolarCalculator.isDaytime(
+      latitude: position.latitude,
+      longitude: position.longitude,
+      time: position.timestamp,
+    );
+
+    // Atualiza odometria inercial / Dead Reckoning se for fix real de satélite
+    if (!isDeadReckoning) {
+      _deadReckoningEngine?.updateWithGps(position);
+    }
+    final drStatus = _deadReckoningEngine?.status ??
+        (position.isAccurate
+            ? DeadReckoningStatus.gpsLocked
+            : DeadReckoningStatus.searchingSignal);
+
+    if (!position.isAccurate && !isDeadReckoning) {
       emit(state.copyWith(
         currentSpeedKmh: position.speedKmh,
         currentBearing: position.bearing,
         isGpsFixValid: false,
         lastPosition: position,
+        isDaytime: isDay,
+        deadReckoningStatus: drStatus,
       ));
       return;
     }
@@ -203,7 +295,7 @@ class DashboardCubit extends Cubit<DashboardState> {
     }
 
     // 4. Executa a máquina de estados de alerta com os POIs filtrados
-    _alertMachine.updatePosition(position, filteredPois);
+    _alertMachine.updatePosition(position, filteredPois, isDeadReckoning: isDeadReckoning);
     final alertState = _alertMachine.state;
     final activeAlert = alertState.activeAlert;
 
@@ -219,6 +311,21 @@ class DashboardCubit extends Cubit<DashboardState> {
     _sectionControlMachine?.updatePosition(position);
     final sectionState = _sectionControlMachine?.state ?? state.sectionControlState;
 
+    // 7. Clusterização espacial de POIs para evitar alertas sonoros e visuais sobrepostos
+    PoiCluster? matchedCluster;
+    final clusterEngine = _poiClusterEngine;
+    if (clusterEngine != null && filteredPois.isNotEmpty) {
+      final clusters = clusterEngine.clusterPois(filteredPois);
+      if (activeAlert != null) {
+        for (final c in clusters) {
+          if (c.allPois.any((p) => p.id == activeAlert.poi.id)) {
+            matchedCluster = c;
+            break;
+          }
+        }
+      }
+    }
+
     emit(state.copyWith(
       currentSpeedKmh: position.speedKmh,
       currentBearing: position.bearing,
@@ -230,6 +337,10 @@ class DashboardCubit extends Cubit<DashboardState> {
       isGpsFixValid: true,
       sectionControlState: sectionState,
       lastPosition: position,
+      isDaytime: isDay,
+      deadReckoningStatus: drStatus,
+      activeCluster: matchedCluster,
+      clearActiveCluster: matchedCluster == null,
     ));
 
     final isAlert = activeAlert != null && alertState.status != AlertStatus.idle;

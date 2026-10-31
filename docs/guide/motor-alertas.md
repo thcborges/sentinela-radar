@@ -86,3 +86,55 @@ Em trechos monitorados por velocidade média, a autuação não depende da veloc
    Caso a velocidade média instantânea supere o limite regulamentado da via ($v_{limite}$), o Sentinela projeta quantos segundos o condutor precisa gastar no trecho remanescente para normalizar a média antes de cruzar o Pórtico B:
    $$t_{alvo} = \max\left(0,\, \frac{S_{total}}{v_{limite} / 3.6} - \Delta t\right) \quad [\text{s}]$$
 4. **Desarme por Desvio ou Timeout:** Caso o condutor saia da rodovia ou estacione por mais de 30 minutos ($> 1.800\text{ s}$), o trecho é automaticamente desarmado sem falso-positivo.
+
+---
+
+## 7. Navegação Inercial & Dead Reckoning em Túneis
+
+Em locais sem recepção de sinal de satélite (ex: Túneis Ayrton Senna, Rebouças, pistas cobertas), o **Sentinela** ativa o motor de **Odometria Inercial (Dead Reckoning)**:
+
+1. **Detecção de Sinal Degradado ou Bloqueado:** Quando a precisão horizontal do GPS excede $40\text{ m}$ ou nenhum fix é recebido no intervalo regulamentar ($> 2.0\text{ s}$), o motor transiciona suavemente de `gpsLocked` para `deadReckoning`.
+2. **Projeção Cinemática Great-Circle:**
+   A posição geográfica estimada a cada segundo é propagada utilizando a última velocidade vetorial e rumo angular conhecidos:
+   $$\phi_2 = \arcsin\left(\sin(\phi_1)\cos(\delta) + \cos(\phi_1)\sin(\delta)\cos(\theta)\right)$$
+   $$\lambda_2 = \lambda_1 + \text{atan2}\left(\sin(\theta)\sin(\delta)\cos(\phi_1),\, \cos(\delta) - \sin(\phi_1)\sin(\phi_2)\right)$$
+   Onde $\delta = \frac{d}{R}$ é a distância angular percorrida no intervalo de tempo.
+3. **Amortecimento Inercial de Velocidade (Damping):** Aplica fator de decaimento suave ($0.995$ por segundo) para evitar superestimação do trajeto no interior do túnel.
+4. **Alerta de Radares Internos:** Radares e redutores posicionados no interior do túnel são disparados regressivamente com precisão mesmo sem satélites visíveis.
+5. **Recuperação e Histerese:** Ao cruzar a saída do túnel e receber fix GPS preciso ($\le 40\text{ m}$), o sistema se ancora nas coordenadas reais retornando para `gpsLocked`.
+
+---
+
+## 8. Perfis Veiculares conforme Código de Trânsito Brasileiro (CTB)
+
+O Sentinela adequa dinamicamente as distâncias de antecipação e as regras de velocidade máxima ao veículo conduzido:
+
+* **Automóvel / Utilitário Leve:** Multiplicador de antecipação $1.0\times$, aplicando o limite nominal de velocidade da via.
+* **Motocicleta:** Multiplicador $0.95\times$, otimizado para a maior agilidade de frenagem e tempo de reação.
+* **Veículo Pesado (Caminhões, Carretas e Ônibus):**
+  - Multiplicador de antecipação $1.40\times$, expandindo o cone de alerta para garantir frenagem segura com carga.
+  - Teto Legal do CTB (**Artigo 61**): Capping automático em **$90\text{ km/h}$** em rodovias federais e estaduais de pista dupla ou simples onde o limite geral para veículos leves for $\ge 100\text{ km/h}$.
+
+---
+
+## 9. Clusterização Espacial & Fusão Hierárquica de POIs
+
+Em cruzamentos complexos e vias expressas onde múltiplos equipamentos de fiscalização atuam colocalizados (ex: radar de velocidade, semáforo com câmera de sinal vermelho e lombada no mesmo ponto):
+
+1. **Agrupamento Geodésico:** POIs situados em raio $\le 45\text{ m}$ são agrupados em um único `PoiCluster`.
+2. **Blindagem de Pistas Opostas:** Radares no mesmo raio físico com diferença azimutal $\ge 120^\circ$ (pistas duplas em sentidos contrários) **não** são agrupados.
+3. **Hierarquia de Severidade:** O ponto de maior criticidade lidera o cluster:
+   $$\text{Semáforo c/ Radar} > \text{Radar Fixo} > \text{Radar Móvel} > \text{Câmera Vermelho} > \text{Free Flow} > \text{Lombada}$$
+4. **Locução TTS Composta Inteligente:** Evita redundâncias na fala (ex: *"Radar fixo, 60 km/h e fiscalização de sinal vermelho à frente"*).
+
+---
+
+## 10. Cálculo Crepuscular & Solar 100% Offline
+
+Para máxima legibilidade diurna e proteção contra ofuscamento noturno e em túneis:
+
+1. **Algoritmo NOAA Offline:** Calcula a equação do tempo e declinação solar astronômica diretamente das coordenadas de GPS do motorista, sem conexões de rede ou consultas meteorológicas.
+2. **Modos de Tema (`HudThemeMode`):**
+   - `darkOnly`: Tema escuro analítico contínuo (#121212).
+   - `dayHighContrast`: Alto contraste para condução sob sol forte no para-brisa.
+   - `solarAutomatic`: Chaveamento automático dia/noite pelo zênite solar oficial ($90^\circ 50'$ civil), com ativação imediata de superfície escura ao transitar por túneis.

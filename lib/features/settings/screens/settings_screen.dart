@@ -2,8 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:sentinela/core/backup/backup_restore_service.dart';
 import 'package:sentinela/core/engine/alert_preferences.dart';
+import 'package:sentinela/core/geo/solar_calculator.dart';
 import 'package:sentinela/core/hardware/wakelock_manager.dart';
 import 'package:sentinela/core/models/poi_model.dart';
+import 'package:sentinela/core/models/vehicle_profile.dart';
 import 'package:sentinela/core/theme/sentinela_theme.dart';
 import 'package:sentinela/data/sync/poi_sync_service.dart';
 import 'package:sentinela/features/dashboard/bloc/dashboard_cubit.dart';
@@ -63,6 +65,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _alertOnlyIfOverSpeed = false;
   double _anticipationSeconds = 15.0;
 
+  // Perfil Veicular (CTB) e Tema HUD
+  VehicleType _selectedVehicleType = VehicleType.car;
+  HudThemeMode _selectedThemeMode = HudThemeMode.darkOnly;
+
   @override
   void initState() {
     super.initState();
@@ -72,6 +78,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _anticipationSeconds = _preferences.anticipationTimeSeconds;
     _audioVoiceTts = _preferences.voiceEnabled;
     _audioBeeps = _preferences.soundEnabled;
+
+    try {
+      final cubitState = widget.dashboardCubit?.state;
+      if (cubitState != null) {
+        _selectedVehicleType = cubitState.vehicleProfile.type;
+        _selectedThemeMode = cubitState.hudThemeMode;
+      }
+    } catch (_) {}
 
     _stats = Map<String, int>.from(widget.initialStats);
     _overlayActive = widget.overlayService?.isOverlayOpen ?? false;
@@ -494,6 +508,130 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Seção Perfil do Veículo (CTB)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Text(
+              'Perfil do Veículo (CTB)',
+              style: TextStyle(
+                color: Color(0xFFB0B0B0),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          Card(
+            color: SentinelaTheme.surfaceContainerDark,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Adequação de limites de velocidade do CTB e cálculo antecipado de frenagem',
+                    style: TextStyle(color: Color(0xFF8E8E8E), fontSize: 13),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: SegmentedButton<VehicleType>(
+                      key: const Key('settings_vehicle_profile_segmented'),
+                      segments: const [
+                        ButtonSegment(
+                          value: VehicleType.car,
+                          label: Text('Carro'),
+                          icon: Icon(Icons.directions_car_rounded),
+                        ),
+                        ButtonSegment(
+                          value: VehicleType.motorcycle,
+                          label: Text('Moto'),
+                          icon: Icon(Icons.two_wheeler_rounded),
+                        ),
+                        ButtonSegment(
+                          value: VehicleType.heavy,
+                          label: Text('Pesado'),
+                          icon: Icon(Icons.local_shipping_rounded),
+                        ),
+                      ],
+                      selected: {_selectedVehicleType},
+                      onSelectionChanged: (set) {
+                        final chosen = set.first;
+                        setState(() => _selectedVehicleType = chosen);
+                        widget.dashboardCubit?.setVehicleProfile(
+                          VehicleProfile.fromType(chosen),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Seção Tema HUD & Fotossensibilidade
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Text(
+              'Tema do HUD & Fotossensibilidade',
+              style: TextStyle(
+                color: Color(0xFFB0B0B0),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          Card(
+            color: SentinelaTheme.surfaceContainerDark,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Alternância para Dark HUD à noite e em túneis para não ofuscar a visão',
+                    style: TextStyle(color: Color(0xFF8E8E8E), fontSize: 13),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: SegmentedButton<HudThemeMode>(
+                      key: const Key('settings_hud_theme_segmented'),
+                      segments: const [
+                        ButtonSegment(
+                          value: HudThemeMode.darkOnly,
+                          label: Text('Dark HUD'),
+                          icon: Icon(Icons.dark_mode_rounded),
+                        ),
+                        ButtonSegment(
+                          value: HudThemeMode.dayHighContrast,
+                          label: Text('Solar'),
+                          icon: Icon(Icons.wb_sunny_rounded),
+                        ),
+                        ButtonSegment(
+                          value: HudThemeMode.solarAutomatic,
+                          label: Text('Automático'),
+                          icon: Icon(Icons.brightness_auto_rounded),
+                        ),
+                      ],
+                      selected: {_selectedThemeMode},
+                      onSelectionChanged: (set) {
+                        final chosen = set.first;
+                        setState(() => _selectedThemeMode = chosen);
+                        widget.dashboardCubit?.setHudThemeMode(chosen);
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
 

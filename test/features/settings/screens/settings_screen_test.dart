@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:sentinela/core/backup/backup_restore_service.dart';
+import 'package:sentinela/core/geo/solar_calculator.dart';
 import 'package:sentinela/core/hardware/wakelock_manager.dart';
 import 'package:sentinela/core/models/poi_model.dart';
+import 'package:sentinela/core/models/vehicle_profile.dart';
 import 'package:sentinela/core/theme/sentinela_theme.dart';
 import 'package:sentinela/data/sync/poi_sync_service.dart';
 import 'package:sentinela/features/dashboard/bloc/dashboard_cubit.dart';
@@ -23,6 +25,8 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(PoiType.fixedRadar);
+    registerFallbackValue(VehicleProfile.car());
+    registerFallbackValue(HudThemeMode.darkOnly);
   });
 
   setUp(() {
@@ -112,6 +116,7 @@ void main() {
 
     testWidgets('deve alterar switches de filtros e notificar DashboardCubit', (tester) async {
       final mockDashboardCubit = MockDashboardCubit();
+      when(() => mockDashboardCubit.state).thenReturn(const DashboardState());
       when(() => mockSyncService.startInAppUpdate()).thenAnswer((_) async => true);
 
       await tester.pumpWidget(
@@ -328,6 +333,46 @@ void main() {
 
       await tester.tap(find.byKey(const Key('settings_alert_only_overspeed_switch')), warnIfMissed: false);
       await tester.pump();
+    });
+
+    testWidgets('deve alterar perfil veicular e tema do HUD nos SegmentedButtons', (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final mockCubit = MockDashboardCubit();
+      when(() => mockCubit.state).thenReturn(const DashboardState());
+      when(() => mockCubit.setVehicleProfile(any())).thenReturn(null);
+      when(() => mockCubit.setHudThemeMode(any())).thenReturn(null);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: SettingsScreen(
+            syncService: mockSyncService,
+            dashboardCubit: mockCubit,
+          ),
+        ),
+      );
+
+      await tester.scrollUntilVisible(find.byKey(const Key('settings_vehicle_profile_segmented')), 300);
+      expect(find.byKey(const Key('settings_vehicle_profile_segmented')), findsOneWidget);
+
+      // Toca em 'Pesado'
+      await tester.tap(find.text('Pesado'), warnIfMissed: false);
+      await tester.pump();
+      verify(() => mockCubit.setVehicleProfile(any())).called(1);
+
+      await tester.scrollUntilVisible(find.byKey(const Key('settings_hud_theme_segmented')), 300);
+      expect(find.byKey(const Key('settings_hud_theme_segmented')), findsOneWidget);
+
+      // Toca em 'Automático'
+      await tester.tap(find.text('Automático'), warnIfMissed: false);
+      await tester.pump();
+      verify(() => mockCubit.setHudThemeMode(HudThemeMode.solarAutomatic)).called(1);
     });
   });
 }
