@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
+import 'package:sentinela/core/engine/section_control_machine.dart';
 import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/core/platform/live_activity_service.dart';
 import 'package:sentinela/data/repository/poi_repository.dart';
@@ -211,6 +212,49 @@ void main() {
 
       await liveCubit.close();
       expect(liveService.isActive, isFalse);
+    });
+
+    test('deve atualizar e resetar SectionControlMachine quando configurado', () async {
+      final corridor = AverageSpeedCorridor.fromCoordinates(
+        id: 'test_corridor',
+        name: 'Trecho Teste SP',
+        speedLimitKmh: 80,
+        entryLatitude: -23.5500,
+        entryLongitude: -46.6300,
+        entryBearing: 0.0,
+        exitLatitude: -23.5400,
+        exitLongitude: -46.6300,
+        exitBearing: 0.0,
+      );
+      final sectionMachine = SectionControlMachine(corridors: [corridor]);
+      final cubitWithSection = DashboardCubit(
+        repository: mockRepo,
+        alertMachine: mockAlertMachine,
+        sectionControlMachine: sectionMachine,
+      );
+
+      when(() => mockRepo.findNearbyPois(
+        latitude: any(named: 'latitude'),
+        longitude: any(named: 'longitude'),
+        radiusMeters: any(named: 'radiusMeters'),
+      )).thenAnswer((_) async => []);
+
+      final entryPos = VehiclePosition(
+        latitude: -23.5501,
+        longitude: -46.6300,
+        speedKmh: 80.0,
+        bearing: 0.0,
+        accuracyMeters: 5.0,
+        timestamp: DateTime(2026, 10, 30, 10, 0, 0),
+      );
+
+      await cubitWithSection.onLocationUpdated(entryPos);
+      expect(cubitWithSection.state.sectionControlState.isActive, isTrue);
+
+      cubitWithSection.resetSectionControl();
+      expect(cubitWithSection.state.sectionControlState.isActive, isFalse);
+
+      await cubitWithSection.close();
     });
   });
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../core/export/route_exporter.dart';
 import '../../../core/models/poi_model.dart';
 import '../../../core/theme/sentinela_theme.dart';
 import '../bloc/stats_cubit.dart';
@@ -11,28 +12,43 @@ class StatsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Estatísticas de Condução'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_sweep_rounded),
-            tooltip: 'Limpar Histórico',
-            onPressed: () => _confirmClearHistory(context),
+    return BlocBuilder<StatsCubit, StatsState>(
+      builder: (context, state) {
+        final summary = state.summary;
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Estatísticas de Condução'),
+            actions: [
+              PopupMenuButton<String>(
+                key: const Key('stats_export_menu_button'),
+                icon: const Icon(Icons.file_download_outlined),
+                tooltip: 'Exportar Trajeto',
+                onSelected: (format) {
+                  _exportRoute(context, state, format);
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: 'gpx',
+                    child: Text('Exportar GPX (1.1)'),
+                  ),
+                  PopupMenuItem(
+                    value: 'kml',
+                    child: Text('Exportar KML (2.2)'),
+                  ),
+                ],
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_sweep_rounded),
+                tooltip: 'Limpar Histórico',
+                onPressed: () => _confirmClearHistory(context),
+              ),
+            ],
           ),
-        ],
-      ),
-      body: BlocBuilder<StatsCubit, StatsState>(
-        builder: (context, state) {
-          if (state.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final summary = state.summary;
-
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
+          body: state.isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
               // 1. Badge de Privacidade Absoluta
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -191,9 +207,9 @@ class StatsScreen extends StatelessWidget {
               else
                 ...state.recentPassages.map((p) => _buildPassageTile(p)),
             ],
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -388,5 +404,47 @@ class StatsScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  void _exportRoute(BuildContext context, StatsState state, String format) {
+    final waypoints = state.recentPassages
+        .where((p) => p.latitude != null && p.longitude != null)
+        .map((p) => PassageWaypoint(
+              name: p.roadName.isNotEmpty ? p.roadName : 'Passagem #${p.id ?? p.poiId}',
+              latitude: p.latitude!,
+              longitude: p.longitude!,
+              speedKmh: p.vehicleSpeedKmh,
+              speedLimit: p.speedLimit,
+              isOverSpeed: p.isOverSpeed,
+              timestamp: p.timestamp,
+              description: p.isOverSpeed
+                  ? 'Excesso de velocidade: ${p.vehicleSpeedKmh.toStringAsFixed(1)} km/h (limite: ${p.speedLimit ?? 0} km/h)'
+                  : 'Velocidade conforme: ${p.vehicleSpeedKmh.toStringAsFixed(1)} km/h',
+            ))
+        .toList();
+
+    const exporter = RouteExporter();
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+
+    if (format == 'gpx') {
+      exporter.exportGpx(routeName: 'Trajeto Sentinela', waypoints: waypoints);
+      messenger.showSnackBar(
+        SnackBar(
+          key: const Key('stats_export_gpx_snackbar'),
+          content: Text('GPX exportado com sucesso (${waypoints.length} waypoints)'),
+          backgroundColor: SentinelaTheme.alertNormal,
+        ),
+      );
+    } else {
+      exporter.exportKml(routeName: 'Trajeto Sentinela', waypoints: waypoints);
+      messenger.showSnackBar(
+        SnackBar(
+          key: const Key('stats_export_kml_snackbar'),
+          content: Text('KML exportado com sucesso (${waypoints.length} waypoints)'),
+          backgroundColor: SentinelaTheme.alertNormal,
+        ),
+      );
+    }
   }
 }

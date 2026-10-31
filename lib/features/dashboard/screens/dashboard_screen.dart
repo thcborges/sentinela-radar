@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sentinela/core/backup/backup_restore_service.dart';
 import 'package:sentinela/core/diagnostics/system_diagnostics.dart';
+import 'package:sentinela/core/engine/section_control_machine.dart';
 import 'package:sentinela/core/hardware/wakelock_manager.dart';
 import 'package:sentinela/core/location/location_service_interface.dart';
 import 'package:sentinela/core/models/poi_model.dart';
@@ -178,6 +179,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 8),
+                                  if (state.sectionControlState.isActive)
+                                    _buildSectionControlBanner(state.sectionControlState),
                                   AlertBannerM3(
                                     key: const Key('dashboard_alert_banner'),
                                     activeAlert: state.activeAlert,
@@ -241,6 +244,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                           const SizedBox(height: 12),
 
+                          // Banner de Radar de Trecho / Velocidade Média Ativo
+                          if (state.sectionControlState.isActive)
+                            _buildSectionControlBanner(state.sectionControlState),
+
                           // Card Central de Alerta Ativo
                           AlertBannerM3(
                             key: const Key('dashboard_alert_banner'),
@@ -283,6 +290,96 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSectionControlBanner(SectionControlState sectionState) {
+    return Container(
+      key: const Key('dashboard_section_control_banner'),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: sectionState.isOverSpeed
+            ? SentinelaTheme.alertCritical.withValues(alpha: 0.15)
+            : SentinelaTheme.alertWarning.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: sectionState.isOverSpeed
+              ? SentinelaTheme.alertCritical
+              : SentinelaTheme.alertWarning,
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Icon(
+                  Icons.speed_rounded,
+                  size: 20,
+                  color: sectionState.isOverSpeed
+                      ? SentinelaTheme.alertCritical
+                      : SentinelaTheme.alertWarning,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'RADAR DE TRECHO (VEL. MÉDIA)',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                          color: sectionState.isOverSpeed
+                              ? SentinelaTheme.alertCritical
+                              : SentinelaTheme.alertWarning,
+                        ),
+                      ),
+                      Text(
+                        '${sectionState.averageSpeedKmh.toStringAsFixed(1)} km/h / Limite: ${sectionState.corridor?.speedLimitKmh.toStringAsFixed(0)} km/h',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${sectionState.remainingDistanceMeters.toStringAsFixed(0)}m rest.',
+                style: const TextStyle(fontSize: 11, color: Color(0xFFB0B0B0)),
+              ),
+              if (sectionState.targetRemainingSeconds > 0)
+                Text(
+                  'Aguarde ${sectionState.targetRemainingSeconds.toStringAsFixed(0)}s',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: SentinelaTheme.alertWarning,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

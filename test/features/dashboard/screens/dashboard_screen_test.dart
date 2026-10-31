@@ -7,6 +7,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:sentinela/core/diagnostics/system_diagnostics.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
 import 'package:sentinela/core/engine/alert_preferences.dart';
+import 'package:sentinela/core/engine/section_control_machine.dart';
 import 'package:sentinela/core/hardware/wakelock_manager.dart';
 import 'package:sentinela/core/location/location_service_interface.dart';
 import 'package:sentinela/core/models/poi_model.dart';
@@ -403,6 +404,56 @@ void main() {
       await tester.pump();
 
       expect(dashboardCubit.state.isHudMirrorMode, isFalse);
+    });
+
+    testWidgets('deve renderizar banner de radar de trecho quando houver trecho ativo', (tester) async {
+      final corridor = AverageSpeedCorridor.fromCoordinates(
+        id: 'c1',
+        name: 'Trecho Via Anchieta',
+        speedLimitKmh: 90,
+        entryLatitude: -23.55,
+        entryLongitude: -46.63,
+        entryBearing: 0.0,
+        exitLatitude: -23.50,
+        exitLongitude: -46.63,
+        exitBearing: 0.0,
+      );
+
+      final cubit = DashboardCubit(
+        repository: mockRepo,
+        alertMachine: mockAlertMachine,
+      );
+      // ignore: invalid_use_of_visible_for_testing_member
+      cubit.emit(cubit.state.copyWith(
+        sectionControlState: SectionControlState(
+          isActive: true,
+          corridor: corridor,
+          averageSpeedKmh: 95.0,
+          isOverSpeed: true,
+          coveredDistanceMeters: 500,
+          remainingDistanceMeters: 1500,
+          elapsedSeconds: 20,
+          targetRemainingSeconds: 15,
+        ),
+      ));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: BlocProvider<DashboardCubit>.value(
+            value: cubit,
+            child: DashboardScreen(syncService: mockSyncService),
+          ),
+        ),
+      );
+
+      expect(find.byKey(const Key('dashboard_section_control_banner')), findsOneWidget);
+      expect(find.text('RADAR DE TRECHO (VEL. MÉDIA)'), findsOneWidget);
+      expect(find.text('95.0 km/h / Limite: 90 km/h'), findsOneWidget);
+      expect(find.text('1500m rest.'), findsOneWidget);
+      expect(find.text('Aguarde 15s'), findsOneWidget);
+
+      await cubit.close();
     });
   });
 }

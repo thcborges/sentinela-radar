@@ -167,5 +167,67 @@ void main() {
       expect(find.text('R\$ 4,20'), findsOneWidget);
       expect(find.text('Tarifa: R\$ 4,20'), findsOneWidget);
     });
+
+    testWidgets('deve disparar exportacao de GPX e KML pelo menu da AppBar', (tester) async {
+      final passages = [
+        PassageRecord(
+          id: 1,
+          poiId: 10,
+          poiType: PoiType.fixedRadar,
+          vehicleSpeedKmh: 58,
+          speedLimit: 60,
+          timestamp: DateTime(2026, 10, 30, 10, 0),
+          isOverSpeed: false,
+          roadName: 'Av. Paulista',
+          latitude: -23.56,
+          longitude: -46.65,
+        ),
+      ];
+
+      when(() => mockStatsCubit.state).thenReturn(
+        StatsState(
+          isLoading: false,
+          summary: const StatsSummary(totalPassages: 1, overSpeedPassages: 0),
+          recentPassages: passages,
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: BlocProvider<StatsCubit>.value(
+            value: mockStatsCubit,
+            child: const StatsScreen(),
+          ),
+        ),
+      );
+
+      // Abrir menu de exportação
+      final menuBtn = find.byKey(const Key('stats_export_menu_button'));
+      expect(menuBtn, findsOneWidget);
+
+      await tester.tap(menuBtn);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Exportar GPX (1.1)'), findsOneWidget);
+      expect(find.text('Exportar KML (2.2)'), findsOneWidget);
+
+      // Tocar em Exportar GPX
+      await tester.tap(find.text('Exportar GPX (1.1)'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('stats_export_gpx_snackbar')), findsOneWidget);
+      expect(find.text('GPX exportado com sucesso (1 waypoints)'), findsOneWidget);
+
+      // Abrir menu novamente e testar KML
+      await tester.tap(menuBtn);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Exportar KML (2.2)'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('stats_export_kml_snackbar')), findsOneWidget);
+      expect(find.text('KML exportado com sucesso (1 waypoints)'), findsOneWidget);
+    });
   });
 }

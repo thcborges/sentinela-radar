@@ -12,6 +12,8 @@ class PassageRecord extends Equatable {
   final bool isOverSpeed;
   final String roadName;
   final double? tollFee;
+  final double? latitude;
+  final double? longitude;
 
   const PassageRecord({
     this.id,
@@ -23,6 +25,8 @@ class PassageRecord extends Equatable {
     required this.isOverSpeed,
     this.roadName = '',
     this.tollFee,
+    this.latitude,
+    this.longitude,
   });
 
   Map<String, dynamic> toMap() {
@@ -36,6 +40,8 @@ class PassageRecord extends Equatable {
       'is_over_speed': isOverSpeed ? 1 : 0,
       'road_name': roadName,
       if (tollFee != null) 'toll_fee': tollFee,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
     };
   }
 
@@ -50,6 +56,8 @@ class PassageRecord extends Equatable {
       isOverSpeed: (map['is_over_speed'] as int) == 1,
       roadName: (map['road_name'] as String?) ?? '',
       tollFee: (map['toll_fee'] as num?)?.toDouble(),
+      latitude: (map['latitude'] as num?)?.toDouble(),
+      longitude: (map['longitude'] as num?)?.toDouble(),
     );
   }
 
@@ -64,6 +72,8 @@ class PassageRecord extends Equatable {
         isOverSpeed,
         roadName,
         tollFee,
+        latitude,
+        longitude,
       ];
 }
 

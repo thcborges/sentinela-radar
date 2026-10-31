@@ -160,3 +160,29 @@ Para garantir operação 100% offline imediata no primeiro boot sem exigir downl
 ## ⚡ Fluxo de Execução Concorrente com Isolates
 
 Para assegurar uma taxa de quadros ininterrupta de 60 a 120 fps no velocímetro durante a ingestão de bases de dados massivas com dezenas de milhares de registros, operações de rede e parsing JSON são descarregadas para `Isolates` independentes via `compute()`.
+
+---
+
+## ⏱️ Radar de Trecho e Velocidade Média (`SectionControlMachine`)
+
+Projetado para trechos rodoviários monitorados por velocidade média:
+* **Entrada e Saída Direcionais (`AverageSpeedCorridor`):** Cadastramento de pórticos de entrada e saída com coordenadas geodésicas e azimutes de aproximação.
+* **Cálculo Contínuo em Tempo Real:** Odômetro cumulativo e cálculo dinâmico da velocidade média com tolerância legal.
+* **Orientação Preventiva:** Projeta o tempo em segundos necessário para o condutor reduzir a velocidade e normalizar a média antes de cruzar o pórtico final.
+
+---
+
+## 🔒 Integridade Criptográfica SHA-256 da Base (`DatabaseIntegrityValidator`)
+
+Garante a inviolabilidade do banco de dados SQLite local e dos pacotes de atualização OTA:
+* **Checksum SHA-256:** Cálculo criptográfico do arquivo de dados antes da ativação atômica no dispositivo.
+* **Auditoria Estrutural SQLite:** Execução de `PRAGMA integrity_check` para atestar ausência de corrupção de páginas e índices B-Tree/R*Tree.
+
+---
+
+## 🗺️ Exportador de Trajetos GPX 1.1 e KML 2.2 (`RouteExporter`)
+
+Permite a extração e compartilhamento de viagens com total privacidade:
+* **Padrões OGC e GPX 1.1:** Geração de arquivos estruturados com track points e waypoints de passagens por radares.
+* **Cores Semânticas Material Design 3:** Diferenciação visual entre pontos conformes e excessos de velocidade.
+* **100% Local e Hermético:** Execução direta no aparelho sem requisições a servidores externos.
