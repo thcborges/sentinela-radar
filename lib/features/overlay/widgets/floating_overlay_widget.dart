@@ -11,6 +11,7 @@ class FloatingOverlayWidget extends StatelessWidget {
   final ActiveAlert? activeAlert;
   final VoidCallback? onTap;
   final VoidCallback? onClose;
+  final VoidCallback? onQuickReport;
 
   const FloatingOverlayWidget({
     super.key,
@@ -18,6 +19,7 @@ class FloatingOverlayWidget extends StatelessWidget {
     this.activeAlert,
     this.onTap,
     this.onClose,
+    this.onQuickReport,
   });
 
   Color _getBorderColor() {
@@ -166,6 +168,22 @@ class FloatingOverlayWidget extends StatelessWidget {
                   Icons.navigation_rounded,
                   color: SentinelaTheme.alertNormal,
                   size: 18,
+                ),
+              ],
+
+              if (onQuickReport != null) ...[
+                const SizedBox(width: 8),
+                GestureDetector(
+                  key: const Key('overlay_quick_report_button'),
+                  onTap: onQuickReport,
+                  child: const Padding(
+                    padding: EdgeInsets.all(2.0),
+                    child: Icon(
+                      Icons.add_location_alt_rounded,
+                      color: SentinelaTheme.primaryGold,
+                      size: 18,
+                    ),
+                  ),
                 ),
               ],
 

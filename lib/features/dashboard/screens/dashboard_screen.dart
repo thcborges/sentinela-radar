@@ -288,6 +288,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           ),
+          floatingActionButton: state.isHudMirrorMode
+              ? null
+              : FloatingActionButton.extended(
+                  key: const Key('dashboard_quick_report_fab'),
+                  onPressed: () => _showQuickReportModal(context),
+                  icon: const Icon(Icons.add_location_alt_rounded),
+                  label: const Text('Marcar Ponto'),
+                  backgroundColor: SentinelaTheme.primaryGold,
+                  foregroundColor: Colors.black,
+                ),
         );
       },
     );
@@ -514,6 +524,145 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
       ],
+    );
+  }
+
+  void _showQuickReportModal(BuildContext context) {
+    final cubit = context.read<DashboardCubit>();
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Marcar Ponto na Via',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Cadastre um ponto offline na sua localização GPS atual',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white70,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    _buildReportChip(
+                      sheetContext,
+                      cubit,
+                      label: 'Radar Móvel',
+                      icon: Icons.camera_alt_rounded,
+                      type: PoiType.mobileRadar,
+                      keyName: 'quick_report_mobile_radar',
+                    ),
+                    _buildReportChip(
+                      sheetContext,
+                      cubit,
+                      label: 'Radar Fixo',
+                      icon: Icons.speed_rounded,
+                      type: PoiType.fixedRadar,
+                      keyName: 'quick_report_fixed_radar',
+                    ),
+                    _buildReportChip(
+                      sheetContext,
+                      cubit,
+                      label: 'Polícia',
+                      icon: Icons.local_police_rounded,
+                      type: PoiType.highwayPatrol,
+                      keyName: 'quick_report_highway_patrol',
+                    ),
+                    _buildReportChip(
+                      sheetContext,
+                      cubit,
+                      label: 'Lombada',
+                      icon: Icons.waves_rounded,
+                      type: PoiType.physicalSpeedBump,
+                      keyName: 'quick_report_speed_bump',
+                    ),
+                    _buildReportChip(
+                      sheetContext,
+                      cubit,
+                      label: 'Semáforo',
+                      icon: Icons.traffic_rounded,
+                      type: PoiType.trafficLightRadar,
+                      keyName: 'quick_report_traffic_light',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildReportChip(
+    BuildContext sheetContext,
+    DashboardCubit cubit, {
+    required String label,
+    required IconData icon,
+    required PoiType type,
+    required String keyName,
+  }) {
+    return ActionChip(
+      key: Key(keyName),
+      avatar: Icon(icon, size: 18, color: SentinelaTheme.primaryGold),
+      label: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+      backgroundColor: const Color(0xFF2C2C2C),
+      side: const BorderSide(color: Colors.white12),
+      onPressed: () async {
+        Navigator.pop(sheetContext);
+        final reported = await cubit.reportQuickPoi(type: type);
+        if (mounted) {
+          final messenger = ScaffoldMessenger.of(context);
+          messenger.hideCurrentSnackBar();
+          messenger.showSnackBar(
+            SnackBar(
+              key: const Key('quick_report_success_snackbar'),
+              content: Text(
+                reported != null
+                    ? '$label marcado com sucesso!'
+                    : 'GPS sem sinal no momento da marcação.',
+              ),
+              backgroundColor: reported != null ? SentinelaTheme.alertNormal : SentinelaTheme.alertWarning,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
     );
   }
 }

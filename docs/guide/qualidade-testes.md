@@ -31,16 +31,16 @@ A estabilidade e precisão do **Sentinela** são garantidas por uma política in
 | `core/location/` (`GeolocatorLocationService`) | 26 / 27 | **96.3%** | ✅ Aprovado |
 | `core/hardware/` (`PlatformWakelockManager`) | 9 / 9 | **100.0%** | ✅ Aprovado |
 | `core/network/` (`PlatformConnectivityChecker`) | 13 / 13 | **100.0%** | ✅ Aprovado |
-| `core/theme/` & `models/` (Theme, POI Models, Distance Calculator) | 60 / 61 | **98.4%** | ✅ Aprovado |
-| `data/database/` & `repository/` (`DatabaseManager`, `PoiRepository`, `SeedDatabaseLoader`) | 143 / 145 | **98.6%** | ✅ Aprovado |
-| `data/sync/` (`PoiSyncService`, `PoiSyncParser`) | 124 / 132 | **93.9%** | ✅ Aprovado |
-| `features/dashboard/` (Speedometer, Sonar, Banner, Section Banner, DashboardScreen) | 447 / 460 | **97.2%** | ✅ Aprovado |
-| `features/overlay/` (`FloatingOverlayWidget`, `OverlayService`) | 79 / 80 | **98.8%** | ✅ Aprovado |
+| `core/theme/` & `models/` (Theme, POI Models, `UserReportedPoi`) | 119 / 120 | **99.2%** | ✅ Aprovado |
+| `data/database/` & `repository/` (`DatabaseManager`, `PoiRepository`, `CustomPoiRepository`) | 209 / 211 | **99.1%** | ✅ Aprovado |
+| `data/sync/` (`PoiSyncService`, `FederalOpenDataParser`, `SyncMirrorManager`, Parser OSM) | 309 / 324 | **95.4%** | ✅ Aprovado |
+| `features/dashboard/` (Speedometer, Sonar, Banner, Section, Quick Report FAB) | 506 / 516 | **98.1%** | ✅ Aprovado |
+| `features/overlay/` (`FloatingOverlayWidget`, `OverlayService`, Quick Report Overlay) | 82 / 83 | **98.8%** | ✅ Aprovado |
 | `features/settings/` (`SettingsScreen`) | 176 / 184 | **95.7%** | ✅ Aprovado |
 | `features/stats/` (`PassageRepository`, `StatsCubit`, `StatsScreen`, Export GPX/KML) | 262 / 266 | **98.5%** | ✅ Aprovado |
 | `background/` (`BackgroundTrackingService`) | 74 / 77 | **96.1%** | ✅ Aprovado |
-| `main.dart` & `overlayMain` | 68 / 72 | **94.4%** | ✅ Aprovado |
-| **Total Consolidado** | **2156 / 2223 linhas** | **96.99%** | ✅ Aprovado (250 testes) |
+| `main.dart` & `overlayMain` | 70 / 74 | **94.6%** | ✅ Aprovado |
+| **Total Consolidado** | **2530 / 2601 linhas** | **97.27%** | ✅ Aprovado (278 testes) |
 
 ---
 

@@ -5,7 +5,9 @@ import 'package:sentinela/core/engine/section_control_machine.dart';
 import 'package:sentinela/core/geo/bearing.dart';
 import 'package:sentinela/core/geo/haversine.dart';
 import 'package:sentinela/core/models/poi_model.dart';
+import 'package:sentinela/core/models/user_reported_poi.dart';
 import 'package:sentinela/core/platform/live_activity_service.dart';
+import 'package:sentinela/data/repository/custom_poi_repository.dart';
 import 'package:sentinela/data/repository/poi_repository.dart';
 
 /// Representação de um POI para visualização no Sonar Circular frontal.
@@ -39,6 +41,8 @@ class DashboardState extends Equatable {
   final Set<PoiType> enabledPoiTypes;
   final bool isHudMirrorMode;
   final SectionControlState sectionControlState;
+  final VehiclePosition? lastPosition;
+  final int userPoiCount;
 
   const DashboardState({
     this.currentSpeedKmh = 0.0,
@@ -51,6 +55,8 @@ class DashboardState extends Equatable {
     this.totalPoisCount = 0,
     this.isHudMirrorMode = false,
     this.sectionControlState = const SectionControlState(),
+    this.lastPosition,
+    this.userPoiCount = 0,
     this.enabledPoiTypes = const {
       PoiType.fixedRadar,
       PoiType.mobileRadar,
@@ -77,6 +83,8 @@ class DashboardState extends Equatable {
     Set<PoiType>? enabledPoiTypes,
     bool? isHudMirrorMode,
     SectionControlState? sectionControlState,
+    VehiclePosition? lastPosition,
+    int? userPoiCount,
   }) {
     return DashboardState(
       currentSpeedKmh: currentSpeedKmh ?? this.currentSpeedKmh,
@@ -90,6 +98,8 @@ class DashboardState extends Equatable {
       enabledPoiTypes: enabledPoiTypes ?? this.enabledPoiTypes,
       isHudMirrorMode: isHudMirrorMode ?? this.isHudMirrorMode,
       sectionControlState: sectionControlState ?? this.sectionControlState,
+      lastPosition: lastPosition ?? this.lastPosition,
+      userPoiCount: userPoiCount ?? this.userPoiCount,
     );
   }
 
@@ -106,6 +116,8 @@ class DashboardState extends Equatable {
         enabledPoiTypes,
         isHudMirrorMode,
         sectionControlState,
+        lastPosition,
+        userPoiCount,
       ];
 }
 
@@ -116,20 +128,24 @@ class DashboardCubit extends Cubit<DashboardState> {
   final AlertMachine _alertMachine;
   final LiveActivityService? _liveActivityService;
   final SectionControlMachine? _sectionControlMachine;
+  final CustomPoiRepository? _customPoiRepository;
 
   DashboardCubit({
     required PoiRepository repository,
     required AlertMachine alertMachine,
     LiveActivityService? liveActivityService,
     SectionControlMachine? sectionControlMachine,
+    CustomPoiRepository? customPoiRepository,
   })  : _repository = repository,
         _alertMachine = alertMachine,
         _liveActivityService = liveActivityService,
         _sectionControlMachine = sectionControlMachine,
+        _customPoiRepository = customPoiRepository,
         super(const DashboardState());
 
   AlertMachine get alertMachine => _alertMachine;
   SectionControlMachine? get sectionControlMachine => _sectionControlMachine;
+  CustomPoiRepository? get customPoiRepository => _customPoiRepository;
 
   /// Processa cada coordenada recebida do GPS nativo.
   Future<void> onLocationUpdated(VehiclePosition position) async {
@@ -138,6 +154,7 @@ class DashboardCubit extends Cubit<DashboardState> {
         currentSpeedKmh: position.speedKmh,
         currentBearing: position.bearing,
         isGpsFixValid: false,
+        lastPosition: position,
       ));
       return;
     }
@@ -212,6 +229,7 @@ class DashboardCubit extends Cubit<DashboardState> {
       nearbySonarPois: sonarItems,
       isGpsFixValid: true,
       sectionControlState: sectionState,
+      lastPosition: position,
     ));
 
     final isAlert = activeAlert != null && alertState.status != AlertStatus.idle;
@@ -258,6 +276,42 @@ class DashboardCubit extends Cubit<DashboardState> {
   void resetSectionControl() {
     _sectionControlMachine?.reset();
     emit(state.copyWith(sectionControlState: const SectionControlState()));
+  }
+
+  /// Carrega a quantidade de POIs reportados/cadastrados pelo usuário localmente.
+  Future<void> loadUserPoiCount() async {
+    final count = await _customPoiRepository?.getCustomPoiCount() ?? 0;
+    emit(state.copyWith(userPoiCount: count));
+  }
+
+  /// Registra com 1 toque um POI customizado na posição atual do condutor (ex: radar móvel avistado).
+  Future<UserReportedPoi?> reportQuickPoi({
+    required PoiType type,
+    int? speedLimit,
+    String? roadName,
+    String? description,
+  }) async {
+    final pos = state.lastPosition;
+    if (pos == null) return null;
+
+    final userPoi = UserReportedPoi(
+      type: type,
+      latitude: pos.latitude,
+      longitude: pos.longitude,
+      speedLimit: speedLimit,
+      direction: pos.bearing.round(),
+      roadName: roadName ?? (state.roadName == 'Monitorando vias...' ? '' : state.roadName),
+      createdAt: DateTime.now(),
+      description: description,
+    );
+
+    final saved = await _customPoiRepository?.addCustomPoi(userPoi) ?? userPoi;
+    await loadUserPoiCount();
+
+    // Reexecuta varredura de POIs na posição atual para atualizar sonar e alertas imediatamente
+    await onLocationUpdated(pos);
+
+    return saved;
   }
 
   @override
