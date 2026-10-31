@@ -17,6 +17,7 @@ void main() {
     mockTts = MockTtsEngine();
     fakeTone = FakeToneGenerator();
     when(() => mockTts.speak(any())).thenAnswer((_) async => true);
+    when(() => mockTts.stop()).thenAnswer((_) async => true);
     player = AudioAlertPlayer(ttsEngine: mockTts, toneGenerator: fakeTone);
   });
 
@@ -194,6 +195,63 @@ void main() {
       expect(fakeTone.playedTones.length, equals(2));
       expect(fakeTone.playedTones.last['frequencyHz'], equals(1200.0));
       expect(fakeTone.playedTones.last['durationMs'], equals(120));
+    });
+
+    test('BUG #35 REGRESSÃO: deve chamar stop() no TTS engine antes de despachar novo alerta via TTS', () async {
+      const alert = ActiveAlert(
+        poi: PoiPoint(id: 50, latitude: 0, longitude: 0, type: PoiType.fixedRadar, speedLimit: 60),
+        distanceMeters: 300,
+        currentSpeedKmh: 50,
+        status: AlertStatus.alerting,
+        isOverSpeed: false,
+        targetBearing: 0,
+        relativeBearing: 0,
+      );
+
+      await player.playAlert(alert, isVoiceEnabled: true, isBeepEnabled: false);
+
+      verifyInOrder([
+        () => mockTts.stop(),
+        () => mockTts.speak('Radar fixo, 60 km/h à frente'),
+      ]);
+    });
+
+    test('BUG #35 REGRESSÃO: deve interromper fala anterior e disparar aviso urgente quando condutor acelerar para overSpeed no mesmo POI antes do debounce de 10s', () async {
+      const normalAlert = ActiveAlert(
+        poi: PoiPoint(id: 60, latitude: 0, longitude: 0, type: PoiType.fixedRadar, speedLimit: 60),
+        distanceMeters: 350,
+        currentSpeedKmh: 50,
+        status: AlertStatus.alerting,
+        isOverSpeed: false,
+        targetBearing: 0,
+        relativeBearing: 0,
+      );
+
+      // 1. Alerta normal de aproximação
+      await player.playAlert(normalAlert, isVoiceEnabled: true, isBeepEnabled: false);
+      verify(() => mockTts.speak('Radar fixo, 60 km/h à frente')).called(1);
+
+      // 2. Condutor acelera 1 segundo depois no mesmo POI (isOverSpeed = true)
+      const overSpeedAlert = ActiveAlert(
+        poi: PoiPoint(id: 60, latitude: 0, longitude: 0, type: PoiType.fixedRadar, speedLimit: 60),
+        distanceMeters: 280,
+        currentSpeedKmh: 75,
+        status: AlertStatus.overSpeed,
+        isOverSpeed: true,
+        targetBearing: 0,
+        relativeBearing: 0,
+      );
+
+      await player.playAlert(overSpeedAlert, isVoiceEnabled: true, isBeepEnabled: false);
+
+      // Deve ter interrompido a fala anterior e falado o aviso urgente de redução
+      verify(() => mockTts.speak('Atenção: Reduza a velocidade. Radar fixo, 60 km/h à frente')).called(1);
+    });
+
+    test('deve chamar stop() no motor TTS e no tone generator ao resetar o player', () async {
+      player.reset();
+      verify(() => mockTts.stop()).called(1);
+      expect(fakeTone.isPlaying, isFalse);
     });
   });
 }
