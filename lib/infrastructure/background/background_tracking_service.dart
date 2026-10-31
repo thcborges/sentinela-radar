@@ -97,7 +97,12 @@ class BackgroundTrackingService {
 
     _lastPosition = position;
     _positionController.add(position);
-    _adaptiveSampler?.updateSpeed(position.speedKmh, timestamp: position.timestamp);
+    _adaptiveSampler?.updateCoordinate(
+      position.latitude,
+      position.longitude,
+      position.speedKmh,
+      timestamp: position.timestamp,
+    );
     _sectionControlMachine?.updatePosition(position);
 
     // 1. Busca POIs no índice espacial SQLite R*Tree (raio de 1200 metros)

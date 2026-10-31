@@ -67,5 +67,58 @@ void main() {
       expect(sampler.isStationary, isFalse);
       expect(sampler.recommendedIntervalMs, equals(1000));
     });
+
+    test('BUG #36 REGRESSÃO: sequência de 10 coordenadas oscilando em repouso (< 2 km/h) deve manter distância acumulada estritamente zero', () {
+      // Coordenada base (Marco Zero da Praça da Sé, SP)
+      const baseLat = -23.550520;
+      const baseLon = -46.633308;
+      final startTime = DateTime(2026, 10, 30, 10, 0, 0);
+
+      // Simula 10 amostras de GPS com jitter de 1 a 2 metros e velocidade 0 km/h
+      final jitterOffsets = [
+        [0.0, 0.0],
+        [0.00001, 0.00001],   // ~1.5m
+        [-0.00001, 0.0],       // ~1.1m
+        [0.000015, -0.00001],  // ~1.9m
+        [0.0, 0.000012],       // ~1.3m
+        [-0.000012, -0.00001], // ~1.8m
+        [0.000008, 0.00001],   // ~1.4m
+        [-0.000005, 0.0],      // ~0.6m
+        [0.00001, -0.000008],  // ~1.3m
+        [0.0, 0.0],            // retorna à origem
+      ];
+
+      for (var i = 0; i < jitterOffsets.length; i++) {
+        final offset = jitterOffsets[i];
+        final deltaDist = sampler.updateCoordinate(
+          baseLat + offset[0],
+          baseLon + offset[1],
+          0.0,
+          timestamp: startTime.add(Duration(seconds: i)),
+        );
+        expect(deltaDist, equals(0.0), reason: 'Amostra $i com jitter não deve pontuar deslocamento');
+      }
+
+      // Distância acumulada deve ser estritamente 0.0
+      expect(sampler.accumulatedDistanceMeters, equals(0.0));
+    });
+
+    test('deslocamento real com velocidade > 2 km/h ou salto > 3m deve acumular distância normalmente', () {
+      const baseLat = -23.550520;
+      const baseLon = -46.633308;
+      final t0 = DateTime(2026, 10, 30, 10, 0, 0);
+
+      // 1. Posição inicial
+      sampler.updateCoordinate(baseLat, baseLon, 0.0, timestamp: t0);
+      expect(sampler.accumulatedDistanceMeters, equals(0.0));
+
+      // 2. Deslocamento real do veículo a 40 km/h (~100m)
+      const nextLat = -23.551420; // ~100m ao sul
+      const nextLon = -46.633308;
+      final dist = sampler.updateCoordinate(nextLat, nextLon, 40.0, timestamp: t0.add(const Duration(seconds: 1)));
+
+      expect(dist, greaterThan(90.0));
+      expect(sampler.accumulatedDistanceMeters, closeTo(100.0, 10.0));
+    });
   });
 }
