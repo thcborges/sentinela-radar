@@ -195,3 +195,20 @@ Projetado para integração nativa com centrais multimídia automotivas via **An
   Diferente da visualização 360°/180° no smartphone, a central multimídia exibe apenas os 3 pontos de maior criticidade no cone frontal de deslocamento, respeitando os padrões de legibilidade rápida da indústria automotiva.
 * **Integração com Comandos de Volante:**
   Ações de volante repassadas via canais nativos acionam diretamente os métodos reativos do `DashboardCubit`, registrando radares móveis com 1 toque sem retirar os olhos da via.
+
+---
+
+## 🛡️ Hardening de Release & Conformidade de Lojas (`ReleaseHardeningService`)
+
+Para o lançamento oficial v1.0.0 nas lojas de aplicativos (Google Play e Apple App Store):
+
+* **Auditoria de Integridade em Runtime (`ReleaseHardeningService`):**
+  Audita em tempo de execução o modo de compilação (Release), ausência de SDKs de telemetria externa, integridade da base pré-embarcada SQLite R*Tree e cumprimento das restrições de trânsito.
+* **Apple Privacy Manifest (`PrivacyInfo.xcprivacy`):**
+  Declaração formal canônica para iOS 17+, atestando `NSPrivacyTracking = false`, ausência de coleta de dados pessoais e justificativas de APIs para `UserDefaults`, `SystemBootTime` e `FileTimestamp`.
+* **Google Play Data Safety:**
+  Mapeamento auditado para o Google Play Console confirmando que coordenadas de GPS operam em processamento estritamente efêmero e local na memória RAM.
+* **Minificação R8 & ProGuard:**
+  Regras de ofuscação e otimização agressivas (`proguard-rules.pro`), preservando bindings C/C++ da biblioteca SQLite espacial e eliminando código morto para geração de binários enxutos.
+* **Pipeline de Release Tagged (`v1.0.0`):**
+  Fluxo automatizado no GitHub Actions disparado por tags de versão que executa a suíte hermética completa de testes, análise Trivy, compilação de Android App Bundle (`.aab`) assinado e cálculo de hashes criptográficos SHA-256.

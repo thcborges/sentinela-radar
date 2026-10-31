@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Rastreamento de Terceiros: Falso (Zero Tracking) -->
+    <key>NSPrivacyTracking</key>
+    <false/>
+
+    <!-- Domínios de Rastreamento: Nenhum -->
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <!-- Dados Coletados: Nenhum dado é transmitido para a nuvem -->
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+
+    <!-- Declaração de APIs de Finalidade Específica Acessadas -->
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <!-- UserDefaults: Acesso estritamente local às preferências do condutor -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPITypeUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+            </array>
+        </dict>
+        <!-- SystemBootTime: Cálculo delta de telemetria e interpolação de GPS -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPITypeSystemBootTime</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>35F9.1</string>
+            </array>
+        </dict>
+        <!-- FileTimestamp: Gerenciamento do banco SQLite e backups offline -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPITypeFileTimestamp</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>C617.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

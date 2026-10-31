@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0",
+  "applicationId": "br.com.sentinela.sentinela",
+  "dataSafety": {
+    "dataCollected": false,
+    "dataShared": false,
+    "ephemeralProcessing": true,
+    "locationData": {
+      "collected": false,
+      "shared": false,
+      "ephemeral": true,
+      "purpose": "O sinal de GPS é processado em tempo real exclusivamente na memória volátil do aparelho para calcular distância aos radares e velocidade instantânea. Coordenadas geográficas nunca são salvas ou enviadas pela rede.",
+      "optional": false
+    },
+    "securityPractices": {
+      "dataEncryptedInTransit": true,
+      "dataDeletionSupported": true,
+      "requiresAccount": false
+    }
+  }
+}
