@@ -10,6 +10,8 @@ jobs:
   build-apk:
     name: Build Android Release APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout do Repositório
         uses: actions/checkout@v4
@@ -37,8 +39,10 @@ jobs:
       - name: Build Android App Bundle (Google Play)
         run: flutter build appbundle --release
 
-      - name: Build Android Release Split APKs
-        run: flutter build apk --release --split-per-abi
+      - name: Build Android Release APK (Universal e Split por ABI)
+        run: |
+          flutter build apk --release
+          flutter build apk --release --split-per-abi
 
       - name: Gerar Checksums SHA-256 dos Binários
         run: |
@@ -64,3 +68,14 @@ jobs:
         with:
           name: sentinela-release-checksums
           path: build/release-checksums/SHA256SUMS.txt
+
+      - name: Publicar GitHub Release Oficial
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: "Sentinela ${{ github.ref_name }} — Versão Oficial"
+          files: |
+            build/app/outputs/flutter-apk/*.apk
+            build/app/outputs/bundle/release/*.aab
+            build/release-checksums/SHA256SUMS.txt
+          generate_release_notes: true
