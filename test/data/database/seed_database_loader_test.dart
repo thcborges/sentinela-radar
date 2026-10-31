@@ -75,5 +75,28 @@ void main() {
       final loader = SeedDatabaseLoader();
       expect(loader, isNotNull);
     });
+
+    test('BUG #33 REGRESSÃO: arquivo .tmp deve ser excluído e não permanecer órfão no disco em caso de falha de I/O', () async {
+      // Simula colisão onde targetPath é um diretório, fazendo o rename falhar com FileSystemException
+      final conflictDir = Directory('${tempDir.path}/conflict_target.db');
+      conflictDir.createSync();
+
+      final tmpFile = File('${tempDir.path}/conflict_target.db.tmp');
+      expect(tmpFile.existsSync(), isFalse);
+
+      final dummyBytes = Uint8List.fromList([1, 2, 3, 4, 5, 6, 7, 8]);
+      final byteData = ByteData.view(dummyBytes.buffer);
+
+      when(() => mockBundle.load(any())).thenAnswer((_) async => byteData);
+
+      final loader = SeedDatabaseLoader(bundle: mockBundle);
+      final installed = await loader.ensureDatabaseInstalled(
+        targetPath: conflictDir.path,
+      );
+
+      expect(installed, isFalse);
+      // O arquivo temporário .tmp NÃO pode permanecer órfão no disco
+      expect(tmpFile.existsSync(), isFalse, reason: 'Arquivo .tmp residual deve ser removido no catch/finally');
+    });
   });
 }

@@ -15,9 +15,16 @@ class SeedDatabaseLoader {
     required String targetPath,
     String assetPath = 'assets/db/sentinela_brasil.db',
   }) async {
+    final tempFile = File('$targetPath.tmp');
     try {
       final targetFile = File(targetPath);
       if (await targetFile.exists()) {
+        // Limpa resíduo órfão se o banco já foi instalado com sucesso
+        if (await tempFile.exists()) {
+          try {
+            await tempFile.delete();
+          } catch (_) {}
+        }
         return true;
       }
 
@@ -32,12 +39,16 @@ class SeedDatabaseLoader {
           data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
 
       // Gravação atômica via arquivo temporário para evitar corrupção em desligamento
-      final tempFile = File('$targetPath.tmp');
       await tempFile.writeAsBytes(bytes, flush: true);
       await tempFile.rename(targetPath);
 
       return true;
     } catch (_) {
+      try {
+        if (await tempFile.exists()) {
+          await tempFile.delete();
+        }
+      } catch (_) {}
       return false;
     }
   }
