@@ -180,9 +180,18 @@ Garante a inviolabilidade do banco de dados SQLite local e dos pacotes de atuali
 
 ---
 
-## 🗺️ Exportador de Trajetos GPX 1.1 e KML 2.2 (`RouteExporter`)
+## 🚗 Integração Automotiva: Android Auto & Apple CarPlay (`AutomotiveService`)
 
-Permite a extração e compartilhamento de viagens com total privacidade:
-* **Padrões OGC e GPX 1.1:** Geração de arquivos estruturados com track points e waypoints de passagens por radares.
-* **Cores Semânticas Material Design 3:** Diferenciação visual entre pontos conformes e excessos de velocidade.
-* **100% Local e Hermético:** Execução direta no aparelho sem requisições a servidores externos.
+Projetado para integração nativa com centrais multimídia automotivas via **Android Auto** (Google Car App Library) e **Apple CarPlay** (`CPTemplate`):
+
+* **Arquitetura Ports & Adapters (`CarAppPlatformInterface`):**
+  Desacoplamento total dos canais de plataforma (`PlatformCarAppAdapter` via `MethodChannel('sentinela/car_app')` e `EventChannel('sentinela/car_app_events')`), com `FakeCarAppPlatform` para testes unitários herméticos sem emuladores veiculares.
+* **Conformidade Estrita com Driver Distraction Guidelines:**
+  Prevenção de sobrecarga cognitiva ao motorista com restrições dinâmicas de botões e ações conforme a velocidade do veículo:
+  * **Estacionado ($\le 5\text{ km/h}$):** Menu rápido completo (reportar radar móvel, reportar lombada, alternar mudo, modo espelho HUD e dispensar alerta).
+  * **Condução Urbana/Normal ($5\text{ a }80\text{ km/h}$):** Máximo de 4 ações rápidas no display.
+  * **Alta Velocidade / Rodovia ($> 80\text{ km/h}$):** Restrição a apenas 2 ações críticas de alta segurança (reporte rápido de radar e botão mudo).
+* **Sonar Frontal Simplificado:**
+  Diferente da visualização 360°/180° no smartphone, a central multimídia exibe apenas os 3 pontos de maior criticidade no cone frontal de deslocamento, respeitando os padrões de legibilidade rápida da indústria automotiva.
+* **Integração com Comandos de Volante:**
+  Ações de volante repassadas via canais nativos acionam diretamente os métodos reativos do `DashboardCubit`, registrando radares móveis com 1 toque sem retirar os olhos da via.
