@@ -36,34 +36,71 @@ class SolarCalculator {
 
   static const double officialZenith = 90.8333; // 90° 50' oficial civil
 
-  /// Retorna [true] se o horário fornecido [time] estiver entre o nascer e o pôr do sol
-  /// na localização geográfica indicada.
+  /// Calcula o ângulo de elevação solar (em graus decimais) no instante [time]
+  /// para as coordenadas [latitude] e [longitude] com base no modelo de efemérides da NOAA.
+  ///
+  /// Retorna valores positivos quando o centro do sol está acima do horizonte astronômico,
+  /// e valores negativos quando abaixo. O limite civil oficial considerando a refração
+  /// atmosférica padrão é aproximadamente -0.8333° (90.8333° de distância zenital).
+  static double calculateSolarElevation({
+    required double latitude,
+    required double longitude,
+    required DateTime time,
+  }) {
+    final utc = time.toUtc();
+    final dayOfYear = _getDayOfYear(utc);
+    final utHour = utc.hour + (utc.minute / 60.0) + (utc.second / 3600.0);
+    final t = dayOfYear + (utHour / 24.0);
+
+    // 1. Anomalia Média do Sol
+    final mDeg = (0.9856 * t) - 3.289;
+    final mRad = _degToRad(mDeg);
+
+    // 2. Longitude Verdadeira do Sol
+    var lDeg = mDeg +
+        (1.916 * math.sin(mRad)) +
+        (0.020 * math.sin(2.0 * mRad)) +
+        282.634;
+    lDeg = _normalizeDegrees(lDeg);
+    final lRad = _degToRad(lDeg);
+
+    // 3. Ascensão Reta do Sol (RA)
+    var raDeg = _radToDeg(math.atan(0.91764 * math.tan(lRad)));
+    raDeg = _normalizeDegrees(raDeg);
+    final lQuadrant = (lDeg / 90.0).floor() * 90.0;
+    final raQuadrant = (raDeg / 90.0).floor() * 90.0;
+    raDeg = raDeg + (lQuadrant - raQuadrant);
+    final raHour = raDeg / 15.0;
+
+    // 4. Declinação Solar
+    final sinDec = 0.39782 * math.sin(lRad);
+    final cosDec = math.cos(math.asin(sinDec));
+
+    // 5. Ângulo Horário Local H (em graus)
+    final hHour = utHour + (longitude / 15.0) - raHour + (0.06571 * t) + 6.622;
+    final hRad = _degToRad(hHour * 15.0);
+
+    // 6. Elevação Solar
+    final latRad = _degToRad(latitude);
+    final sinAltitude = (math.sin(latRad) * sinDec) +
+        (math.cos(latRad) * cosDec * math.cos(hRad));
+    return _radToDeg(math.asin(sinAltitude.clamp(-1.0, 1.0)));
+  }
+
+  /// Retorna [true] se o horário fornecido [time] estiver no período diurno
+  /// na localização geográfica indicada (sol acima do horizonte civil).
   static bool isDaytime({
     required double latitude,
     required double longitude,
     required DateTime time,
   }) {
-    final sunrise = calculateSunrise(
+    final elevation = calculateSolarElevation(
       latitude: latitude,
       longitude: longitude,
-      date: time,
+      time: time,
     );
-    final sunset = calculateSunset(
-      latitude: latitude,
-      longitude: longitude,
-      date: time,
-    );
-
-    if (sunrise == null && sunset == null) {
-      // Regiões polares com dia/noite perpétuo
-      return latitude > 0 ? (time.month >= 4 && time.month <= 9) : !(time.month >= 4 && time.month <= 9);
-    }
-
-    if (sunrise != null && sunset != null) {
-      return time.isAfter(sunrise) && time.isBefore(sunset);
-    }
-
-    return true;
+    // Limite oficial civil: centro do sol acima de -0.8333° (-50 minutos de arco)
+    return elevation > -0.8333;
   }
 
   /// Calcula a data/hora local aproximada do nascer do sol.
