@@ -161,3 +161,16 @@ Para assegurar inclusão total a motoristas com deficiência visual ou auditiva,
    - Suporte multilíngue de primeira classe para Português (`pt`), Inglês (`en`) e Espanhol (`es`).
    - Dicionários semânticos nativos para todos os tipos de POIs e terminologia do cockpit.
    - Locução de áudio veicular TTS traduzida contextualmente (`TTSAlertFormatter`), permitindo condução assistida para usuários e turistas no Brasil e no exterior.
+
+---
+
+## 12. Modulação Veicular para Android Auto & Apple CarPlay
+
+Na projeção veicular na central multimídia, o fluxo contínuo de telemetria é filtrado para cumprir as normas internacionais de segurança no trânsito (NHTSA / Google Auto / Apple MFi):
+
+1. **Classificação Dinâmica de Distração (`CarDistractionLevel`):**
+   $$\text{Nível} = \begin{cases} \text{parked}, & v \le 5\text{ km/h} \\ \text{highSpeed}, & v > 80\text{ km/h} \\ \text{driving}, & 5\text{ km/h} < v \le 80\text{ km/h} \end{cases}$$
+2. **Filtragem Cone Frontal ($\pm 60^\circ$):**
+   Descarta pontos situados na retaguarda do veículo antes de transmitir ao barramento da central multimídia, limitando o sonar a 3 alvos prioritários.
+3. **Mapeamento de Ações Imediatas:**
+   Botões físicos de volante e teclas de toque rápido são mapeados diretamente para a máquina de estados, reduzindo o tempo de reação do condutor a 0 segundos sem desviar a atenção da estrada.

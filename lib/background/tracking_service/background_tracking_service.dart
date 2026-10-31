@@ -1,5 +1,6 @@
 import 'dart:async';
 import '../../core/audio/audio_alert_player.dart';
+import '../../core/automotive/automotive_service.dart';
 import '../../core/engine/adaptive_gps_sampler.dart';
 import '../../core/engine/alert_machine.dart';
 import '../../core/engine/section_control_machine.dart';
@@ -26,6 +27,7 @@ class BackgroundTrackingService {
   final LiveActivityService? _liveActivityService;
   final TollRateEstimator? _tollEstimator;
   final SectionControlMachine? _sectionControlMachine;
+  final AutomotiveService? _automotiveService;
 
   bool isVoiceEnabled;
   bool isBeepEnabled;
@@ -49,6 +51,7 @@ class BackgroundTrackingService {
     LiveActivityService? liveActivityService,
     TollRateEstimator? tollEstimator,
     SectionControlMachine? sectionControlMachine,
+    AutomotiveService? automotiveService,
     this.isVoiceEnabled = true,
     this.isBeepEnabled = true,
     Set<PoiType>? enabledPoiTypes,
@@ -61,6 +64,7 @@ class BackgroundTrackingService {
         _liveActivityService = liveActivityService,
         _tollEstimator = tollEstimator,
         _sectionControlMachine = sectionControlMachine,
+        _automotiveService = automotiveService,
         enabledPoiTypes = enabledPoiTypes ?? Set.from(PoiType.values);
 
   bool get isRunning => _isRunning;
@@ -69,6 +73,7 @@ class BackgroundTrackingService {
   AdaptiveGpsSampler? get adaptiveSampler => _adaptiveSampler;
   TollRateEstimator? get tollEstimator => _tollEstimator;
   SectionControlMachine? get sectionControlMachine => _sectionControlMachine;
+  AutomotiveService? get automotiveService => _automotiveService;
 
   Stream<ActiveAlert?> get alertStream => _alertController.stream;
   Stream<VehiclePosition> get positionStream => _positionController.stream;
@@ -167,6 +172,15 @@ class BackgroundTrackingService {
         roadName: alert?.poi.roadName,
         isAlertActive: isAlert,
       ),
+    );
+
+    // 7. Envia dados para o console veicular (Android Auto / Apple CarPlay)
+    await _automotiveService?.updateWithPosition(
+      position: position,
+      roadName: alert?.poi.roadName ?? 'Monitorando vias...',
+      activeAlert: alert,
+      alertStatus: _alertMachine.state.status,
+      isMuted: !isVoiceEnabled,
     );
   }
 

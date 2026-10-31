@@ -1,6 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:sentinela/core/automotive/automotive_service.dart';
+import 'package:sentinela/core/automotive/car_app_models.dart';
+import 'package:sentinela/core/automotive/car_app_platform_interface.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
+import 'package:sentinela/core/engine/alert_preferences.dart';
 import 'package:sentinela/core/engine/poi_cluster_engine.dart';
 import 'package:sentinela/core/engine/section_control_machine.dart';
 import 'package:sentinela/core/geo/dead_reckoning_engine.dart';
@@ -21,6 +25,10 @@ class MockAlertMachine extends Mock implements AlertMachine {}
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  setUpAll(() {
+    registerFallbackValue(const AlertPreferences());
+  });
+
   late MockPoiRepository mockRepo;
   late MockAlertMachine mockAlertMachine;
   late DashboardCubit cubit;
@@ -29,6 +37,7 @@ void main() {
     mockRepo = MockPoiRepository();
     mockAlertMachine = MockAlertMachine();
     when(() => mockAlertMachine.state).thenReturn(const AlertState(status: AlertStatus.idle));
+    when(() => mockAlertMachine.preferences).thenReturn(const AlertPreferences());
     cubit = DashboardCubit(
       repository: mockRepo,
       alertMachine: mockAlertMachine,
@@ -444,6 +453,106 @@ void main() {
 
       cubit.setHighContrastMode(true);
       expect(cubit.state.highContrastMode, isTrue);
+    });
+
+    test('deve responder às ações do volante e central automotiva (Android Auto / Apple CarPlay)', () async {
+      final fakePlatform = FakeCarAppPlatform();
+      final autoService = AutomotiveService(platform: fakePlatform);
+      fakePlatform.setSimulatedConnectionStatus(CarConnectionStatus.connectedCarPlay);
+      await pumpEventQueue();
+
+      when(() => mockRepo.findNearbyPois(
+        latitude: any(named: 'latitude'),
+        longitude: any(named: 'longitude'),
+        radiusMeters: any(named: 'radiusMeters'),
+      )).thenAnswer((_) async => []);
+
+      final cubitWithAuto = DashboardCubit(
+        repository: mockRepo,
+        alertMachine: mockAlertMachine,
+        automotiveService: autoService,
+      );
+
+      // Posição válida para permitir reportQuickPoi
+      await cubitWithAuto.onLocationUpdated(VehiclePosition(
+        latitude: -23.55,
+        longitude: -46.63,
+        speedKmh: 40.0,
+        bearing: 90.0,
+        accuracyMeters: 5.0,
+        timestamp: DateTime.now(),
+      ));
+
+      // 1. quickReportRadar
+      fakePlatform.simulateCarAction(CarAction.quickReportRadar);
+      await pumpEventQueue();
+
+      // 2. quickReportSpeedBump
+      fakePlatform.simulateCarAction(CarAction.quickReportSpeedBump);
+      await pumpEventQueue();
+
+      // 3. toggleMute
+      when(() => mockAlertMachine.preferences).thenReturn(const AlertPreferences(voiceEnabled: true));
+      when(() => mockAlertMachine.updatePreferences(any())).thenReturn(null);
+      fakePlatform.simulateCarAction(CarAction.toggleMute);
+      await pumpEventQueue();
+      verify(() => mockAlertMachine.updatePreferences(any())).called(1);
+
+      // 4. toggleHudTheme
+      expect(cubitWithAuto.state.isHudMirrorMode, isFalse);
+      fakePlatform.simulateCarAction(CarAction.toggleHudTheme);
+      await pumpEventQueue();
+      expect(cubitWithAuto.state.isHudMirrorMode, isTrue);
+
+      // 5. dismissAlert
+      when(() => mockAlertMachine.reset()).thenReturn(null);
+      fakePlatform.simulateCarAction(CarAction.dismissAlert);
+      await pumpEventQueue();
+      verify(() => mockAlertMachine.reset()).called(1);
+
+      // Getters
+      expect(cubitWithAuto.automotiveService, equals(autoService));
+      expect(cubitWithAuto.hapticEngine, isNotNull);
+
+      await cubitWithAuto.close();
+    });
+
+    test('tickDeadReckoning quando sem posição projetada deve atualizar deadReckoningStatus', () async {
+      final deadReckoning = DeadReckoningEngine();
+      final cubitWithDr = DashboardCubit(
+        repository: mockRepo,
+        alertMachine: mockAlertMachine,
+        deadReckoningEngine: deadReckoning,
+      );
+
+      expect(cubitWithDr.deadReckoningEngine, equals(deadReckoning));
+
+      final result = await cubitWithDr.tickDeadReckoning(DateTime.now());
+      expect(result, isNull);
+      expect(cubitWithDr.state.deadReckoningStatus, DeadReckoningStatus.searchingSignal);
+
+      await cubitWithDr.close();
+    });
+
+    test('deve acionar triggerPoiPassed quando status for AlertStatus.passed', () async {
+      when(() => mockRepo.findNearbyPois(
+        latitude: any(named: 'latitude'),
+        longitude: any(named: 'longitude'),
+        radiusMeters: any(named: 'radiusMeters'),
+      )).thenAnswer((_) async => []);
+
+      when(() => mockAlertMachine.state).thenReturn(const AlertState(status: AlertStatus.passed));
+
+      await cubit.onLocationUpdated(VehiclePosition(
+        latitude: -23.55,
+        longitude: -46.63,
+        speedKmh: 40.0,
+        bearing: 90.0,
+        accuracyMeters: 5.0,
+        timestamp: DateTime.now(),
+      ));
+
+      expect(cubit.state.alertStatus, AlertStatus.passed);
     });
   });
 }

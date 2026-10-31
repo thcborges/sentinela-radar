@@ -434,5 +434,28 @@ void main() {
       await tester.pump();
       verify(() => mockCubit.setHighContrastMode(true)).called(1);
     });
+
+    testWidgets('deve renderizar seção de integração automotiva (Android Auto & CarPlay)', (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: SettingsScreen(
+            syncService: mockSyncService,
+          ),
+        ),
+      );
+
+      await tester.scrollUntilVisible(find.byKey(const Key('settings_car_app_status_tile')), 300);
+      expect(find.byKey(const Key('settings_car_app_status_tile')), findsOneWidget);
+      expect(find.text('Status da Central Multimídia'), findsOneWidget);
+      expect(find.text('Pronto / Ativo'), findsOneWidget);
+    });
   });
 }
