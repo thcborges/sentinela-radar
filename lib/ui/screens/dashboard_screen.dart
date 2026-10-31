@@ -50,22 +50,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    widget.wakelockManager?.enable();
-    if (widget.locationService != null) {
+    try {
+      widget.wakelockManager?.enable();
+    } catch (_) {}
+
+    _initLocationTracking();
+  }
+
+  void _initLocationTracking() async {
+    if (widget.locationService == null) return;
+
+    try {
+      final perm = await widget.locationService!.checkPermission();
+      if (perm == LocationPermissionStatus.denied) {
+        await widget.locationService!.requestPermission();
+      }
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    try {
       _locationSubscription = widget.locationService!
           .getPositionStream()
-          .listen((pos) {
-        if (mounted) {
-          context.read<DashboardCubit>().onLocationUpdated(pos);
-        }
-      });
-    }
+          .listen(
+            (pos) {
+              if (mounted) {
+                context.read<DashboardCubit>().onLocationUpdated(pos);
+              }
+            },
+            onError: (_) {
+              // Previne interrupção e tela branca caso ocorra falha de hardware ou permissão
+            },
+          );
+    } catch (_) {}
   }
 
   @override
   void dispose() {
     _locationSubscription?.cancel();
-    widget.wakelockManager?.disable();
+    try {
+      widget.wakelockManager?.disable();
+    } catch (_) {}
     super.dispose();
   }
 

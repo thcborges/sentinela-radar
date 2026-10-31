@@ -575,5 +575,67 @@ void main() {
       expect(find.text('+1 fiscalização colocalizada'), findsOneWidget);
       await mockCubit.close();
     });
+
+    testWidgets('BUG #51 REGRESSÃO: deve checar e solicitar permissão de GPS na inicialização', (tester) async {
+      final mockLocation = MockLocationService();
+      when(() => mockLocation.checkPermission())
+          .thenAnswer((_) async => LocationPermissionStatus.denied);
+      when(() => mockLocation.requestPermission())
+          .thenAnswer((_) async => LocationPermissionStatus.whileInUse);
+      when(() => mockLocation.getPositionStream(
+            distanceFilterMeters: any(named: 'distanceFilterMeters'),
+            intervalMs: any(named: 'intervalMs'),
+          )).thenAnswer((_) => const Stream.empty());
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: BlocProvider<DashboardCubit>.value(
+            value: dashboardCubit,
+            child: DashboardScreen(
+              syncService: mockSyncService,
+              locationService: mockLocation,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      verify(() => mockLocation.checkPermission()).called(1);
+      verify(() => mockLocation.requestPermission()).called(1);
+    });
+
+    testWidgets('BUG #51 REGRESSÃO: deve tolerar erro no stream de localização sem travar a interface', (tester) async {
+      final mockLocation = MockLocationService();
+      final streamController = StreamController<VehiclePosition>();
+      when(() => mockLocation.checkPermission())
+          .thenAnswer((_) async => LocationPermissionStatus.whileInUse);
+      when(() => mockLocation.getPositionStream(
+            distanceFilterMeters: any(named: 'distanceFilterMeters'),
+            intervalMs: any(named: 'intervalMs'),
+          )).thenAnswer((_) => streamController.stream);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: BlocProvider<DashboardCubit>.value(
+            value: dashboardCubit,
+            child: DashboardScreen(
+              syncService: mockSyncService,
+              locationService: mockLocation,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Emite um erro no stream simulando falha de hardware ou revogação de permissão
+      streamController.addError(Exception('GPS stream failure'));
+      await tester.pump();
+
+      expect(find.text('SENTINELA'), findsOneWidget);
+      await streamController.close();
+    });
   });
 }

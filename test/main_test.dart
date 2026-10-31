@@ -94,4 +94,38 @@ void main() {
       } catch (_) {}
     }
   });
+
+  testWidgets('BUG #51 REGRESSÃO: SentinelaApp deve suportar databasePath e fazer fallback gracioso para memória em caso de erro', (tester) async {
+    final mockLocation = MockLocationService();
+    final mockConnectivity = MockConnectivityChecker();
+    when(() => mockLocation.getPositionStream(
+          distanceFilterMeters: any(named: 'distanceFilterMeters'),
+          intervalMs: any(named: 'intervalMs'),
+        )).thenAnswer((_) => const Stream.empty());
+
+    // Caminho inválido/não gravável simulando raiz '/' protegida do Android
+    await tester.pumpWidget(app.SentinelaApp(
+      databasePath: '/non_existent_and_forbidden_dir/sentinela.db',
+      locationService: mockLocation,
+      connectivityChecker: mockConnectivity,
+    ));
+    await tester.pump();
+
+    expect(find.text('SENTINELA'), findsOneWidget);
+  });
+
+  testWidgets('BUG #51 REGRESSÃO: ErrorWidget.builder deve renderizar aviso Dark HUD em vez de tela branca', (tester) async {
+    final errorWidget = app.buildErrorWidget(FlutterErrorDetails(
+      exception: Exception('Falha de inicialização simulada'),
+    ));
+
+    await tester.pumpWidget(MaterialApp(
+      home: errorWidget,
+    ));
+    await tester.pump();
+
+    expect(find.text('SENTINELA'), findsOneWidget);
+    expect(find.text('Ocorreu uma instabilidade na inicialização visual.'), findsOneWidget);
+    expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
+  });
 }
