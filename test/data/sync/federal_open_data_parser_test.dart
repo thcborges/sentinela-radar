@@ -175,5 +175,102 @@ void main() {
       expect(FederalOpenDataParser.parseAnttJson('{}'), isEmpty);
       expect(FederalOpenDataParser.parseAnttCsv(''), isEmpty);
     });
+
+    test('BUG #34 REGRESSÃO: deve parsear CSV do DNIT com coordenadas e velocidades formatadas em PT-BR (vírgula decimal)', () {
+      const dnitCsvCommasInQuotes = '''id,uf,rodovia,km,municipio,tipo_equipamento,velocidade_regulamentada,latitude,longitude,sentido
+301,MG,BR-381,450.2,Belo Horizonte,Radar Fixo,"60,0","-19,9167","-43,9345",Decrescente
+''';
+      final poisQuotes = FederalOpenDataParser.parseDnitCsv(dnitCsvCommasInQuotes);
+      expect(poisQuotes.length, 1);
+      expect(poisQuotes[0].id, 301);
+      expect(poisQuotes[0].latitude, -19.9167);
+      expect(poisQuotes[0].longitude, -43.9345);
+      expect(poisQuotes[0].speedLimit, 60);
+
+      const dnitCsvSemicolons = '''id;uf;rodovia;km;municipio;tipo_equipamento;velocidade_regulamentada;latitude;longitude;sentido
+302;PR;BR-277;100,0;Curitiba;Lombada Eletrônica;50,0;-25,4284;-49,2733;Ambos
+''';
+      final poisSemicolons = FederalOpenDataParser.parseDnitCsv(dnitCsvSemicolons);
+      expect(poisSemicolons.length, 1);
+      expect(poisSemicolons[0].id, 302);
+      expect(poisSemicolons[0].latitude, -25.4284);
+      expect(poisSemicolons[0].longitude, -49.2733);
+      expect(poisSemicolons[0].speedLimit, 50);
+      expect(poisSemicolons[0].type, PoiType.electronicSpeedBump);
+    });
+
+    test('BUG #34 REGRESSÃO: deve parsear CSV da ANTT com coordenadas e tarifas com vírgula decimal e ponto-e-vírgula', () {
+      const anttCsv = '''id;concessionaria;rodovia;km;municipio;uf;tipo_praca;tarifa_carro;latitude;longitude
+701;Autovias;BR-050;85,0;Uberaba;MG;Convencional;8,90;-19,7472;-47,9392
+''';
+      final pois = FederalOpenDataParser.parseAnttCsv(anttCsv);
+      expect(pois.length, 1);
+      expect(pois[0].id, 701);
+      expect(pois[0].latitude, -19.7472);
+      expect(pois[0].longitude, -47.9392);
+      expect(pois[0].tollFeeCar, 8.90);
+    });
+
+    test('BUG #34 REGRESSÃO: deve parsear JSON CKAN do DNIT com coordenadas e velocidades em formato String com vírgula', () {
+      const dnitJson = '''
+      {
+        "success": true,
+        "result": {
+          "records": [
+            {
+              "_id": 401,
+              "uf": "SP",
+              "rodovia": "BR-116",
+              "km": "230,5",
+              "municipio": "São Paulo",
+              "tipo_equipamento": "Radar Fixo",
+              "velocidade_regulamentada": "60,0",
+              "latitude": "-23,5505",
+              "longitude": "-46,6333",
+              "sentido": "Crescente"
+            }
+          ]
+        }
+      }
+      ''';
+
+      final pois = FederalOpenDataParser.parseDnitJson(dnitJson);
+      expect(pois.length, 1);
+      expect(pois[0].id, 401);
+      expect(pois[0].latitude, -23.5505);
+      expect(pois[0].longitude, -46.6333);
+      expect(pois[0].speedLimit, 60);
+    });
+
+    test('BUG #34 REGRESSÃO: deve parsear JSON CKAN da ANTT com coordenadas e tarifas em String com vírgula', () {
+      const anttJson = '''
+      {
+        "success": true,
+        "result": {
+          "records": [
+            {
+              "id": "801",
+              "concessionaria": "CCR RioSP",
+              "rodovia": "BR-116",
+              "km": "180,0",
+              "municipio": "Guarulhos",
+              "uf": "SP",
+              "tipo_praca": "Convencional",
+              "tarifa_carro": "15,20",
+              "latitude": "-23,4628",
+              "longitude": "-46,5333"
+            }
+          ]
+        }
+      }
+      ''';
+
+      final pois = FederalOpenDataParser.parseAnttJson(anttJson);
+      expect(pois.length, 1);
+      expect(pois[0].id, 801);
+      expect(pois[0].latitude, -23.4628);
+      expect(pois[0].longitude, -46.5333);
+      expect(pois[0].tollFeeCar, 15.20);
+    });
   });
 }
