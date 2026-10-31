@@ -22,6 +22,7 @@ dependencies:
   wakelock_plus_platform_interface: ^1.7.0
   connectivity_plus_platform_interface: ^2.1.0
   crypto: ^3.0.6
+  path_provider: ^2.1.0
 
 dev_dependencies:
   flutter_test:
