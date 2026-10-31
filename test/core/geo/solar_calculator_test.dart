@@ -121,17 +121,19 @@ void main() {
     });
 
     test('deve calcular elevação solar com precisão astronômica em qualquer coordenada', () {
+      // 12:00 local em São Paulo (UTC-3) corresponde a 15:00 UTC (zênite solar próximo)
       final noonElevation = SolarCalculator.calculateSolarElevation(
         latitude: spLat,
         longitude: spLon,
-        time: DateTime(2026, 10, 30, 12, 0, 0),
+        time: DateTime.utc(2026, 10, 30, 15, 0, 0),
       );
       expect(noonElevation, greaterThan(60.0));
 
+      // 00:30 local em São Paulo (UTC-3) corresponde a 03:30 UTC (escuridão noturna profunda)
       final midnightElevation = SolarCalculator.calculateSolarElevation(
         latitude: spLat,
         longitude: spLon,
-        time: DateTime(2026, 10, 30, 0, 30, 0),
+        time: DateTime.utc(2026, 10, 30, 3, 30, 0),
       );
       expect(midnightElevation, lessThan(-30.0));
     });
