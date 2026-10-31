@@ -12,6 +12,7 @@ class AudioAlertPlayer {
 
   int? _lastSpokenPoiId;
   DateTime? _lastSpokenTimestamp;
+  bool _lastSpokenWasOverSpeed = false;
   DateTime? _lastBeepTimestamp;
 
   AudioAlertPlayer({
@@ -37,16 +38,23 @@ class AudioAlertPlayer {
 
     final now = DateTime.now();
 
-    // 1. Fala via TTS com debounce por POI (não repete o mesmo ponto em menos de 10s)
+    // 1. Fala via TTS com debounce por POI e preempção/escalação em sobrevelocidade
     if (isVoiceEnabled && _ttsEngine != null) {
       final isNewPoi = _lastSpokenPoiId != alert.poi.id;
       final isDebounceExpired = _lastSpokenTimestamp == null ||
           now.difference(_lastSpokenTimestamp!).inSeconds >= 10;
+      final isEscalatingToOverSpeed =
+          alert.isOverSpeed && !_lastSpokenWasOverSpeed;
 
-      if (isNewPoi || isDebounceExpired) {
+      if (isNewPoi || isEscalatingToOverSpeed || isDebounceExpired) {
         _lastSpokenPoiId = alert.poi.id;
         _lastSpokenTimestamp = now;
+        _lastSpokenWasOverSpeed = alert.isOverSpeed;
         final message = TtsAlertFormatter.formatSpokenAlert(alert);
+        // Interrompe fala anterior ativa antes de sintetizar novo alerta urgente
+        try {
+          await _ttsEngine.stop();
+        } catch (_) {}
         await _ttsEngine.speak(message);
       }
     }
@@ -83,7 +91,11 @@ class AudioAlertPlayer {
   void reset() {
     _lastSpokenPoiId = null;
     _lastSpokenTimestamp = null;
+    _lastSpokenWasOverSpeed = false;
     _lastBeepTimestamp = null;
+    try {
+      _ttsEngine?.stop();
+    } catch (_) {}
     _toneGenerator?.stop();
   }
 
