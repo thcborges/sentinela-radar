@@ -45,9 +45,12 @@ void main() {
       expect(sunrise, isNotNull);
       expect(sunset, isNotNull);
 
-      // Em outubro em SP, o sol nasce entre 05h e 06h30 e se põe entre 18h e 19h30
-      expect(sunrise!.hour, inInclusiveRange(4, 7));
-      expect(sunset!.hour, inInclusiveRange(17, 20));
+      // Em outubro em SP (fuso horário oficial de Brasília UTC-3),
+      // o sol nasce entre 05h e 06h30 local e se põe entre 18h e 19h30 local
+      final spSunriseLocalHour = sunrise!.toUtc().subtract(const Duration(hours: 3)).hour;
+      final spSunsetLocalHour = sunset!.toUtc().subtract(const Duration(hours: 3)).hour;
+      expect(spSunriseLocalHour, inInclusiveRange(4, 7));
+      expect(spSunsetLocalHour, inInclusiveRange(17, 20));
       expect(sunset.isAfter(sunrise), isTrue);
     });
 
