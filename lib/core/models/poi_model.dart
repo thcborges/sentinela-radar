@@ -51,6 +51,9 @@ enum PoiType {
     return PoiType.fixedRadar;
   }
 
+  /// Nome descritivo da categoria.
+  String get displayName => label;
+
   /// Indica se o POI fiscaliza limite de velocidade regulamentada.
   bool get isSpeedEnforcement =>
       this == fixedRadar ||

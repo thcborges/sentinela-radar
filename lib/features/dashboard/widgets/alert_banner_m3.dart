@@ -60,7 +60,15 @@ class AlertBannerM3 extends StatelessWidget {
         ? '${(alert.distanceMeters / 1000.0).toStringAsFixed(1)} km'
         : '${alert.distanceMeters.round()} m';
 
-    return Container(
+    final alertLabel = 'Alerta de ${alert.poi.type.displayName}. '
+        '${isCritical ? "Atenção: Reduza a velocidade. " : ""}'
+        'Distância: $distanceFormatted.'
+        '${alert.poi.speedLimit != null ? " Limite: ${alert.poi.speedLimit} km/h." : ""}';
+
+    return Semantics(
+      liveRegion: true,
+      label: alertLabel,
+      child: Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isCritical ? const Color(0xFF2C0A0E) : const Color(0xFF221C0B),
@@ -172,7 +180,8 @@ class AlertBannerM3 extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   IconData _iconForPoiType(PoiType type) {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sentinela/core/engine/alert_machine.dart';
@@ -7,9 +8,11 @@ import 'package:sentinela/core/geo/bearing.dart';
 import 'package:sentinela/core/geo/dead_reckoning_engine.dart';
 import 'package:sentinela/core/geo/haversine.dart';
 import 'package:sentinela/core/geo/solar_calculator.dart';
+import 'package:sentinela/core/l10n/app_language.dart';
 import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/core/models/user_reported_poi.dart';
 import 'package:sentinela/core/models/vehicle_profile.dart';
+import 'package:sentinela/core/platform/haptic_feedback_engine.dart';
 import 'package:sentinela/core/platform/live_activity_service.dart';
 import 'package:sentinela/data/repository/custom_poi_repository.dart';
 import 'package:sentinela/data/repository/poi_repository.dart';
@@ -52,6 +55,10 @@ class DashboardState extends Equatable {
   final HudThemeMode hudThemeMode;
   final bool isDaytime;
   final PoiCluster? activeCluster;
+  final bool hapticEnabled;
+  final HapticIntensity hapticIntensity;
+  final AppLanguage language;
+  final bool highContrastMode;
 
   const DashboardState({
     this.currentSpeedKmh = 0.0,
@@ -71,6 +78,10 @@ class DashboardState extends Equatable {
     this.hudThemeMode = HudThemeMode.darkOnly,
     this.isDaytime = false,
     this.activeCluster,
+    this.hapticEnabled = true,
+    this.hapticIntensity = HapticIntensity.medium,
+    this.language = AppLanguage.pt,
+    this.highContrastMode = false,
     this.enabledPoiTypes = const {
       PoiType.fixedRadar,
       PoiType.mobileRadar,
@@ -114,6 +125,10 @@ class DashboardState extends Equatable {
     bool? isDaytime,
     PoiCluster? activeCluster,
     bool clearActiveCluster = false,
+    bool? hapticEnabled,
+    HapticIntensity? hapticIntensity,
+    AppLanguage? language,
+    bool? highContrastMode,
   }) {
     return DashboardState(
       currentSpeedKmh: currentSpeedKmh ?? this.currentSpeedKmh,
@@ -134,6 +149,10 @@ class DashboardState extends Equatable {
       hudThemeMode: hudThemeMode ?? this.hudThemeMode,
       isDaytime: isDaytime ?? this.isDaytime,
       activeCluster: clearActiveCluster ? null : (activeCluster ?? this.activeCluster),
+      hapticEnabled: hapticEnabled ?? this.hapticEnabled,
+      hapticIntensity: hapticIntensity ?? this.hapticIntensity,
+      language: language ?? this.language,
+      highContrastMode: highContrastMode ?? this.highContrastMode,
     );
   }
 
@@ -157,6 +176,10 @@ class DashboardState extends Equatable {
         hudThemeMode,
         isDaytime,
         activeCluster,
+        hapticEnabled,
+        hapticIntensity,
+        language,
+        highContrastMode,
       ];
 }
 
@@ -170,6 +193,7 @@ class DashboardCubit extends Cubit<DashboardState> {
   final CustomPoiRepository? _customPoiRepository;
   final DeadReckoningEngine? _deadReckoningEngine;
   final PoiClusterEngine? _poiClusterEngine;
+  final HapticFeedbackEngine _hapticEngine;
 
   DashboardCubit({
     required PoiRepository repository,
@@ -179,6 +203,7 @@ class DashboardCubit extends Cubit<DashboardState> {
     CustomPoiRepository? customPoiRepository,
     DeadReckoningEngine? deadReckoningEngine,
     PoiClusterEngine? poiClusterEngine,
+    HapticFeedbackEngine? hapticEngine,
   })  : _repository = repository,
         _alertMachine = alertMachine,
         _liveActivityService = liveActivityService,
@@ -186,6 +211,7 @@ class DashboardCubit extends Cubit<DashboardState> {
         _customPoiRepository = customPoiRepository,
         _deadReckoningEngine = deadReckoningEngine,
         _poiClusterEngine = poiClusterEngine,
+        _hapticEngine = hapticEngine ?? HapticFeedbackEngine(),
         super(const DashboardState());
 
   AlertMachine get alertMachine => _alertMachine;
@@ -193,6 +219,25 @@ class DashboardCubit extends Cubit<DashboardState> {
   CustomPoiRepository? get customPoiRepository => _customPoiRepository;
   DeadReckoningEngine? get deadReckoningEngine => _deadReckoningEngine;
   PoiClusterEngine? get poiClusterEngine => _poiClusterEngine;
+  HapticFeedbackEngine get hapticEngine => _hapticEngine;
+
+  /// Atualiza preferências táteis de feedback háptico.
+  void setHapticFeedback({bool? enabled, HapticIntensity? intensity}) {
+    emit(state.copyWith(
+      hapticEnabled: enabled ?? state.hapticEnabled,
+      hapticIntensity: intensity ?? state.hapticIntensity,
+    ));
+  }
+
+  /// Define o idioma ativo na interface e nas mensagens de áudio/acessibilidade.
+  void setLanguage(AppLanguage language) {
+    emit(state.copyWith(language: language));
+  }
+
+  /// Ativa ou desativa o modo de alto contraste para acessibilidade visual e luz solar intensa.
+  void setHighContrastMode(bool enabled) {
+    emit(state.copyWith(highContrastMode: enabled));
+  }
 
   /// Atualiza o perfil veicular (CTB) ativo no Dashboard e na máquina de alertas.
   void setVehicleProfile(VehicleProfile profile) {
@@ -298,6 +343,20 @@ class DashboardCubit extends Cubit<DashboardState> {
     _alertMachine.updatePosition(position, filteredPois, isDeadReckoning: isDeadReckoning);
     final alertState = _alertMachine.state;
     final activeAlert = alertState.activeAlert;
+
+    // Disparo háptico tátil conforme severidade do alerta (não bloqueia telemetria de GPS)
+    if (activeAlert != null) {
+      unawaited(_hapticEngine.triggerForAlert(
+        activeAlert,
+        hapticEnabled: state.hapticEnabled,
+        intensity: state.hapticIntensity,
+      ));
+    } else if (alertState.status == AlertStatus.passed) {
+      unawaited(_hapticEngine.triggerPoiPassed(
+        hapticEnabled: state.hapticEnabled,
+        intensity: state.hapticIntensity,
+      ));
+    }
 
     // 5. Determina nome da via para exibição no topo
     String activeRoad = 'Monitorando vias...';
@@ -417,6 +476,10 @@ class DashboardCubit extends Cubit<DashboardState> {
     );
 
     final saved = await _customPoiRepository?.addCustomPoi(userPoi) ?? userPoi;
+    unawaited(_hapticEngine.triggerQuickReport(
+      hapticEnabled: state.hapticEnabled,
+      intensity: state.hapticIntensity,
+    ));
     await loadUserPoiCount();
 
     // Reexecuta varredura de POIs na posição atual para atualizar sonar e alertas imediatamente

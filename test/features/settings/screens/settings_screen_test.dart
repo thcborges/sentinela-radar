@@ -3,10 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:sentinela/core/backup/backup_restore_service.dart';
+import 'package:sentinela/core/engine/alert_machine.dart';
+import 'package:sentinela/core/engine/alert_preferences.dart';
 import 'package:sentinela/core/geo/solar_calculator.dart';
 import 'package:sentinela/core/hardware/wakelock_manager.dart';
+import 'package:sentinela/core/l10n/app_language.dart';
 import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/core/models/vehicle_profile.dart';
+import 'package:sentinela/core/platform/haptic_feedback_engine.dart';
 import 'package:sentinela/core/theme/sentinela_theme.dart';
 import 'package:sentinela/data/sync/poi_sync_service.dart';
 import 'package:sentinela/features/dashboard/bloc/dashboard_cubit.dart';
@@ -18,6 +22,7 @@ class MockDashboardCubit extends Mock implements DashboardCubit {}
 class MockOverlayService extends Mock implements OverlayService {}
 class MockWakelockManager extends Mock implements WakelockManager {}
 class MockBackupRestoreService extends Mock implements BackupRestoreService {}
+class MockAlertMachine extends Mock implements AlertMachine {}
 
 void main() {
   late MockPoiSyncService mockSyncService;
@@ -27,6 +32,9 @@ void main() {
     registerFallbackValue(PoiType.fixedRadar);
     registerFallbackValue(VehicleProfile.car());
     registerFallbackValue(HudThemeMode.darkOnly);
+    registerFallbackValue(AppLanguage.pt);
+    registerFallbackValue(HapticIntensity.medium);
+    registerFallbackValue(const AlertPreferences());
   });
 
   setUp(() {
@@ -373,6 +381,58 @@ void main() {
       await tester.tap(find.text('Automático'), warnIfMissed: false);
       await tester.pump();
       verify(() => mockCubit.setHudThemeMode(HudThemeMode.solarAutomatic)).called(1);
+    });
+
+    testWidgets('deve alterar idioma, feedback háptico e modo alto contraste', (tester) async {
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final mockCubit = MockDashboardCubit();
+      final mockAlertMachine = MockAlertMachine();
+      when(() => mockCubit.state).thenReturn(const DashboardState());
+      when(() => mockCubit.alertMachine).thenReturn(mockAlertMachine);
+      when(() => mockAlertMachine.updatePreferences(any())).thenReturn(null);
+      when(() => mockCubit.setLanguage(any())).thenReturn(null);
+      when(() => mockCubit.setHapticFeedback(
+            enabled: any(named: 'enabled'),
+            intensity: any(named: 'intensity'),
+          )).thenReturn(null);
+      when(() => mockCubit.setHighContrastMode(any())).thenReturn(null);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: SentinelaTheme.darkTheme,
+          home: SettingsScreen(
+            syncService: mockSyncService,
+            dashboardCubit: mockCubit,
+          ),
+        ),
+      );
+
+      // 1. Idioma
+      await tester.scrollUntilVisible(find.byKey(const Key('settings_language_segmented')), 300);
+      expect(find.byKey(const Key('settings_language_segmented')), findsOneWidget);
+      await tester.tap(find.text('English'), warnIfMissed: false);
+      await tester.pump();
+      verify(() => mockCubit.setLanguage(AppLanguage.en)).called(1);
+
+      // 2. Feedback Háptico
+      await tester.scrollUntilVisible(find.byKey(const Key('settings_haptic_switch')), 300);
+      expect(find.byKey(const Key('settings_haptic_switch')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('settings_haptic_switch')), warnIfMissed: false);
+      await tester.pump();
+      verify(() => mockCubit.setHapticFeedback(enabled: false, intensity: any(named: 'intensity'))).called(1);
+
+      // 3. Alto Contraste
+      await tester.scrollUntilVisible(find.byKey(const Key('settings_high_contrast_switch')), 300);
+      expect(find.byKey(const Key('settings_high_contrast_switch')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('settings_high_contrast_switch')), warnIfMissed: false);
+      await tester.pump();
+      verify(() => mockCubit.setHighContrastMode(true)).called(1);
     });
   });
 }
