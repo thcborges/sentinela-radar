@@ -4,8 +4,10 @@ import 'package:sentinela/core/engine/alert_machine.dart';
 import 'package:sentinela/core/engine/section_control_machine.dart';
 import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/core/platform/live_activity_service.dart';
+import 'package:sentinela/data/repository/custom_poi_repository.dart';
 import 'package:sentinela/data/repository/poi_repository.dart';
 import 'package:sentinela/features/dashboard/bloc/dashboard_cubit.dart';
+import 'package:sqlite3/sqlite3.dart';
 
 class MockPoiRepository extends Mock implements PoiRepository {}
 class MockAlertMachine extends Mock implements AlertMachine {}
@@ -255,6 +257,56 @@ void main() {
       expect(cubitWithSection.state.sectionControlState.isActive, isFalse);
 
       await cubitWithSection.close();
+    });
+
+    test('reportQuickPoi deve persistir ponto customizado e atualizar contagem e sonar', () async {
+      final db = sqlite3.openInMemory();
+      final customRepo = CustomPoiRepository(db);
+      customRepo.initializeSchema();
+
+      final cubitWithCustom = DashboardCubit(
+        repository: mockRepo,
+        alertMachine: mockAlertMachine,
+        customPoiRepository: customRepo,
+      );
+
+      when(() => mockRepo.findNearbyPois(
+        latitude: any(named: 'latitude'),
+        longitude: any(named: 'longitude'),
+        radiusMeters: any(named: 'radiusMeters'),
+      )).thenAnswer((_) async => []);
+
+      // Sem posição GPS, não deve registrar
+      final nullReport = await cubitWithCustom.reportQuickPoi(type: PoiType.mobileRadar);
+      expect(nullReport, isNull);
+
+      final currentPos = VehiclePosition(
+        latitude: -23.5505,
+        longitude: -46.6333,
+        speedKmh: 60.0,
+        bearing: 90.0,
+        accuracyMeters: 4.0,
+        timestamp: DateTime(2026, 10, 30, 10, 0, 0),
+      );
+
+      await cubitWithCustom.onLocationUpdated(currentPos);
+
+      final saved = await cubitWithCustom.reportQuickPoi(
+        type: PoiType.mobileRadar,
+        speedLimit: 60,
+        description: 'Viatura avistada no acostamento',
+      );
+
+      expect(saved, isNotNull);
+      expect(saved!.type, PoiType.mobileRadar);
+      expect(saved.latitude, -23.5505);
+      expect(saved.longitude, -46.6333);
+      expect(saved.speedLimit, 60);
+      expect(saved.direction, 90);
+      expect(cubitWithCustom.state.userPoiCount, 1);
+
+      await cubitWithCustom.close();
+      db.close();
     });
   });
 }

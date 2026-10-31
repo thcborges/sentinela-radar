@@ -4,6 +4,7 @@ import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/core/network/connectivity_checker.dart';
 import 'package:sentinela/data/database/database_manager.dart';
 import 'package:sentinela/data/sync/poi_sync_service.dart';
+import 'package:sentinela/data/sync/sync_mirror_manager.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:test/test.dart';
 
@@ -213,6 +214,110 @@ void main() {
       final standalone = PoiSyncService(db);
       expect(standalone, isNotNull);
       standalone.dispose();
+    });
+
+    test('syncFromFederalData deve ingerir dados do DNIT e ANTT com swap atômico', () async {
+      const dnitCsv = '''id,uf,rodovia,km,municipio,tipo_equipamento,velocidade_regulamentada,latitude,longitude,sentido
+301,SP,BR-116,200.0,São Paulo,Radar Fixo,80,-23.5505,-46.6333,Ambos
+''';
+      const anttCsv = '''id,concessionaria,rodovia,km,municipio,uf,tipo_praca,tarifa_carro,latitude,longitude
+302,CCR,BR-116,210.0,Guarulhos,SP,Free Flow,4.50,-23.4600,-46.5300
+''';
+
+      final success = await syncService.syncFromFederalData(
+        dnitPayload: dnitCsv,
+        anttPayload: anttCsv,
+        isCsv: true,
+      );
+
+      expect(success, isTrue);
+      expect(dbManager.getTotalCount(), 2);
+    });
+
+    test('syncFromFederalData com payloads vazios deve falhar graciosamente', () async {
+      final success = await syncService.syncFromFederalData(
+        dnitPayload: '',
+        anttPayload: '',
+      );
+
+      expect(success, isFalse);
+    });
+
+    test('syncFromRemote deve utilizar SyncMirrorManager se fornecido', () async {
+      final mockMirror = SyncMirrorManager(
+        client: mockClient,
+        mirrors: ['https://mirror.test/api'],
+      );
+
+      when(() => mockClient.post(
+            any(),
+            body: any(named: 'body'),
+            headers: any(named: 'headers'),
+          )).thenAnswer((_) async => http.Response(validOverpassJson, 200));
+
+      final mirrorSyncService = PoiSyncService(
+        db,
+        mirrorManager: mockMirror,
+      );
+
+      final success = await mirrorSyncService.syncFromRemote();
+      expect(success, isTrue);
+      expect(dbManager.getTotalCount(), 2);
+
+      mirrorSyncService.dispose();
+    });
+
+    test('startInAppUpdate deve disparar syncFromRemote', () async {
+      when(() => mockClient.post(
+            any(),
+            body: any(named: 'body'),
+            headers: any(named: 'headers'),
+          )).thenAnswer((_) async => http.Response(validOverpassJson, 200));
+
+      final success = await syncService.startInAppUpdate();
+      expect(success, isTrue);
+    });
+
+    test('syncFromFederalData deve suportar JSON e classificar categorias', () async {
+      const dnitJson = '''
+      {
+        "result": {
+          "records": [
+            {
+              "_id": 801,
+              "tipo_equipamento": "Radar Fixo",
+              "velocidade_regulamentada": 60,
+              "latitude": -23.55,
+              "longitude": -46.63,
+              "sentido": "Crescente"
+            }
+          ]
+        }
+      }
+      ''';
+      const anttJson = '''
+      {
+        "result": {
+          "records": [
+            {
+              "id": 802,
+              "tipo_praca": "Free Flow",
+              "latitude": -23.46,
+              "longitude": -46.53
+            }
+          ]
+        }
+      }
+      ''';
+
+      final success = await syncService.syncFromFederalData(
+        dnitPayload: dnitJson,
+        anttPayload: anttJson,
+        isCsv: false,
+      );
+
+      expect(success, isTrue);
+      expect(dbManager.getTotalCount(), 2);
     });
   });
 }

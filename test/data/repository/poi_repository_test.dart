@@ -1,5 +1,7 @@
 import 'package:sentinela/core/models/poi_model.dart';
+import 'package:sentinela/core/models/user_reported_poi.dart';
 import 'package:sentinela/data/database/database_manager.dart';
+import 'package:sentinela/data/repository/custom_poi_repository.dart';
 import 'package:sentinela/data/repository/poi_repository.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:test/test.dart';
@@ -8,13 +10,16 @@ void main() {
   group('PoiRepository', () {
     late Database db;
     late DatabaseManager dbManager;
+    late CustomPoiRepository customPoiRepository;
     late PoiRepository repository;
 
     setUp(() {
       db = sqlite3.openInMemory();
       dbManager = DatabaseManager(db);
       dbManager.initializeSchema();
-      repository = PoiRepository(dbManager);
+      customPoiRepository = CustomPoiRepository(db);
+      customPoiRepository.initializeSchema();
+      repository = PoiRepository(dbManager, customPoiRepository: customPoiRepository);
     });
 
     tearDown(() {
@@ -105,6 +110,38 @@ void main() {
       await repository.savePoi(singlePoi);
       final count = await repository.getTotalCount();
       expect(count, equals(1));
+    });
+
+    test('findNearbyPois deve mesclar e ordenar POIs da base oficial com POIs customizados do usuário', () async {
+      // Ponto oficial da base: ~220m
+      const officialPoi = PoiPoint(
+        id: 1,
+        type: PoiType.fixedRadar,
+        latitude: -23.5525,
+        longitude: -46.6333,
+        speedLimit: 60,
+      );
+      await repository.savePoi(officialPoi);
+
+      // Ponto customizado do usuário: ~75m (mais próximo que o oficial)
+      await customPoiRepository.addCustomPoi(UserReportedPoi(
+        type: PoiType.mobileRadar,
+        latitude: -23.5512,
+        longitude: -46.6333,
+        speedLimit: 50,
+        createdAt: DateTime.now(),
+      ));
+
+      final results = await repository.findNearbyPois(
+        latitude: -23.5505,
+        longitude: -46.6333,
+        radiusMeters: 500,
+      );
+
+      expect(results.length, 2);
+      expect(results.first.type, PoiType.mobileRadar);
+      expect(results.first.source, 'user_reported');
+      expect(results.last.type, PoiType.fixedRadar);
     });
   });
 }

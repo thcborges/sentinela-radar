@@ -17,6 +17,7 @@ class SentinelaTheme {
   static const Color alertWarning = Color(0xFFFFD600); // Amarelo/Âmbar (Aproximação compatível)
   static const Color alertCritical = Color(0xFFFF1744); // Vermelho (Excesso de velocidade / Crítico)
   static const Color alertInfo = Color(0xFF00B0FF); // Azul (Pedágios e Postos Policiais)
+  static const Color primaryGold = Color(0xFFFFD600); // Amarelo/Ouro para ações em destaque M3
 
   /// Mapeia o estado da máquina de alertas para sua respectiva cor semântica.
   static Color colorForAlertStatus(AlertStatus status) {

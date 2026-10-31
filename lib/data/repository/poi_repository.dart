@@ -2,19 +2,21 @@ import '../../core/geo/bounding_box.dart';
 import '../../core/geo/haversine.dart';
 import '../../core/models/poi_model.dart';
 import '../database/database_manager.dart';
+import 'custom_poi_repository.dart';
 
 /// Repositório central de acesso aos Pontos de Interesse (Radares, Semáforos, Lombadas e Pedágios).
 class PoiRepository {
   final DatabaseManager dbManager;
+  final CustomPoiRepository? customPoiRepository;
 
-  PoiRepository(this.dbManager);
+  PoiRepository(this.dbManager, {this.customPoiRepository});
 
   /// Busca todos os POIs localizados dentro do raio esférico [radiusMeters]
   /// a partir das coordenadas [latitude, longitude].
   ///
   /// Utiliza primeiro o índice espacial **SQLite R*Tree** para poda em Bounding Box,
   /// refinando em seguida pela fórmula exata de **Haversine** e ordenando os pontos
-  /// por ordem crescente de distância.
+  /// por ordem crescente de distância. Incorpora também pontos cadastrados pelo usuário.
   Future<List<PoiPoint>> findNearbyPois({
     required double latitude,
     required double longitude,
@@ -40,6 +42,24 @@ class PoiRepository {
         poi.longitude,
       );
       if (dist <= radiusMeters) {
+        refined.add((poi: poi, distance: dist));
+      }
+    }
+
+    // Incorporação de POIs customizados adicionados pelo usuário
+    if (customPoiRepository != null) {
+      final customPois = await customPoiRepository!.findNearbyCustomPois(
+        latitude: latitude,
+        longitude: longitude,
+        radiusMeters: radiusMeters,
+      );
+      for (final poi in customPois) {
+        final dist = haversineDistance(
+          latitude,
+          longitude,
+          poi.latitude,
+          poi.longitude,
+        );
         refined.add((poi: poi, distance: dist));
       }
     }

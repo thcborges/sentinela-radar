@@ -4,7 +4,9 @@ import 'package:http/http.dart' as http;
 import 'package:sqlite3/sqlite3.dart';
 import '../../core/models/poi_model.dart';
 import '../../core/network/connectivity_checker.dart';
+import 'federal_open_data_parser.dart';
 import 'poi_sync_parser.dart';
+import 'sync_mirror_manager.dart';
 
 /// Ciclo de vida e status da rotina de sincronização de dados abertos.
 enum SyncStatus {
@@ -42,6 +44,7 @@ class PoiSyncService {
   final String overpassUrl;
   final bool _ownsClient;
   final NetworkConnectivityChecker? _connectivityChecker;
+  final SyncMirrorManager? _mirrorManager;
 
   final StreamController<SyncProgress> _progressController =
       StreamController<SyncProgress>.broadcast();
@@ -51,9 +54,11 @@ class PoiSyncService {
     http.Client? httpClient,
     this.overpassUrl = 'https://overpass-api.de/api/interpreter',
     NetworkConnectivityChecker? connectivityChecker,
+    SyncMirrorManager? mirrorManager,
   })  : _client = httpClient ?? http.Client(),
         _ownsClient = httpClient == null,
-        _connectivityChecker = connectivityChecker;
+        _connectivityChecker = connectivityChecker,
+        _mirrorManager = mirrorManager;
 
   /// Stream reativo para acompanhamento na tela de Configurações em tempo real.
   Stream<SyncProgress> get progressStream => _progressController.stream;
@@ -108,11 +113,19 @@ class PoiSyncService {
     ''';
 
     try {
-      final response = await _client.post(
-        Uri.parse(overpassUrl),
-        body: {'data': customQuery ?? defaultQuery},
-        headers: {'User-Agent': 'Sentinela/1.0 (Mobile Sync)'},
-      ).timeout(const Duration(minutes: 5));
+      final http.Response response;
+      if (_mirrorManager != null) {
+        response = await _mirrorManager.postQueryWithFailover(
+          query: customQuery ?? defaultQuery,
+          timeout: const Duration(minutes: 5),
+        );
+      } else {
+        response = await _client.post(
+          Uri.parse(overpassUrl),
+          body: {'data': customQuery ?? defaultQuery},
+          headers: {'User-Agent': 'Sentinela/1.0 (Mobile Sync)'},
+        ).timeout(const Duration(minutes: 5));
+      }
 
       if (response.statusCode != 200) {
         _progressController.add(SyncProgress(
@@ -137,6 +150,54 @@ class PoiSyncService {
     return _processAndCommit(jsonPayload);
   }
 
+  /// Ingestão e sincronização direta a partir de conjuntos de dados governamentais
+  /// abertos (DNIT PNCV e ANTT Concessões/Free Flow).
+  Future<bool> syncFromFederalData({
+    String? dnitPayload,
+    String? anttPayload,
+    bool isCsv = false,
+  }) async {
+    try {
+      _progressController.add(const SyncProgress(
+        status: SyncStatus.processing,
+        message: 'Processando bases federais (DNIT / ANTT)...',
+        progress: 0.2,
+      ));
+
+      final allPois = <PoiPoint>[];
+      if (dnitPayload != null && dnitPayload.isNotEmpty) {
+        final dnitPois = isCsv
+            ? FederalOpenDataParser.parseDnitCsv(dnitPayload)
+            : FederalOpenDataParser.parseDnitJson(dnitPayload);
+        allPois.addAll(dnitPois);
+      }
+
+      if (anttPayload != null && anttPayload.isNotEmpty) {
+        final anttPois = isCsv
+            ? FederalOpenDataParser.parseAnttCsv(anttPayload)
+            : FederalOpenDataParser.parseAnttJson(anttPayload);
+        allPois.addAll(anttPois);
+      }
+
+      if (allPois.isEmpty) {
+        _progressController.add(const SyncProgress(
+          status: SyncStatus.error,
+          message: 'Nenhum registro válido encontrado nas bases federais informadas.',
+        ));
+        return false;
+      }
+
+      final deduplicated = PoiSyncParser.deduplicatePois(allPois);
+      return await _commitPois(deduplicated);
+    } catch (e) {
+      _progressController.add(SyncProgress(
+        status: SyncStatus.error,
+        message: 'Falha durante o processamento de dados federais: $e',
+      ));
+      return false;
+    }
+  }
+
   /// Realiza o parsing, deduplicação e swap atômico das tabelas no SQLite.
   Future<bool> _processAndCommit(String payload) async {
     try {
@@ -149,6 +210,18 @@ class PoiSyncService {
       final rawPois = PoiSyncParser.parseJsonPayload(payload);
       final dedupPois = PoiSyncParser.deduplicatePois(rawPois);
 
+      return await _commitPois(dedupPois);
+    } catch (e) {
+      _progressController.add(SyncProgress(
+        status: SyncStatus.error,
+        message: 'Falha durante o processamento ou gravação atômica: $e',
+      ));
+      return false;
+    }
+  }
+
+  Future<bool> _commitPois(List<PoiPoint> dedupPois) async {
+    try {
       _progressController.add(SyncProgress(
         status: SyncStatus.saving,
         message: 'Gravando ${dedupPois.length} pontos com swap atômico...',

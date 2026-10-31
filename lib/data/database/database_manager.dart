@@ -44,6 +44,22 @@ class DatabaseManager {
           value TEXT
       );
     ''');
+
+    // Tabela de POIs customizados cadastrados pelo condutor (100% offline e persistente)
+    db.execute('''
+      CREATE TABLE IF NOT EXISTS custom_pois (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type INTEGER NOT NULL,
+        latitude REAL NOT NULL,
+        longitude REAL NOT NULL,
+        speed_limit INTEGER,
+        direction INTEGER,
+        tolerance_angle REAL DEFAULT 35.0,
+        road_name TEXT,
+        created_at TEXT NOT NULL,
+        description TEXT
+      );
+    ''');
   }
 
   /// Insere ou substitui um POI e sincroniza seu registro correspondente no índice R*Tree.
