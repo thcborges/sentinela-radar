@@ -86,6 +86,7 @@ void main() {
 
       mockTts = MockTtsEngine();
       when(() => mockTts.speak(any())).thenAnswer((_) async => true);
+      when(() => mockTts.stop()).thenAnswer((_) async {});
       audioPlayer = AudioAlertPlayer(ttsEngine: mockTts);
 
       mockOverlayAdapter = MockOverlayAdapter();
