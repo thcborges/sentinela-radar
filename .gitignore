@@ -36,3 +36,6 @@ docs/.vitepress/cache/
 # Sistema operacional
 .DS_Store
 Thumbs.db
+
+# Ferramentas locais / Cache
+graphify-out/
