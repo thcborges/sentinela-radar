@@ -12,6 +12,10 @@ class AdaptiveGpsSampler {
   final double stationarySpeedThresholdKmh;
   final double deadBandMeters;
   final double deadBandSpeedThresholdKmh;
+  final int stationaryIntervalMs;
+  final int activeIntervalMs;
+  final int stationaryDistanceFilterMeters;
+  final int activeDistanceFilterMeters;
 
   bool _isStationary = false;
   DateTime? _stationarySince;
@@ -24,16 +28,22 @@ class AdaptiveGpsSampler {
     this.stationarySpeedThresholdKmh = 5.0,
     this.deadBandMeters = 3.0,
     this.deadBandSpeedThresholdKmh = 2.0,
+    this.stationaryIntervalMs = 1000,
+    this.activeIntervalMs = 1000,
+    this.stationaryDistanceFilterMeters = 2,
+    this.activeDistanceFilterMeters = 2,
   });
 
   bool get isStationary => _isStationary;
   double get accumulatedDistanceMeters => _accumulatedDistanceMeters;
 
-  /// Intervalo recomendado em milissegundos para polling e consultas espaciais.
-  int get recommendedIntervalMs => _isStationary ? 3000 : 1000;
+  /// Intervalo recomendado em milissegundos para polling e consultas espaciais (tempo quase real <= 1s).
+  int get recommendedIntervalMs =>
+      _isStationary ? stationaryIntervalMs : activeIntervalMs;
 
   /// Filtro mínimo de deslocamento recomendado em metros para o chip GPS.
-  int get recommendedDistanceFilterMeters => _isStationary ? 10 : 2;
+  int get recommendedDistanceFilterMeters =>
+      _isStationary ? stationaryDistanceFilterMeters : activeDistanceFilterMeters;
 
   /// Atualiza o estado do sampler e calcula o deslocamento real aplicando filtro de banda morta.
   double updateCoordinate(

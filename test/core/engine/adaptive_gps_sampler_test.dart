@@ -36,12 +36,12 @@ void main() {
       sampler.updateSpeed(2.0, timestamp: t1);
       expect(sampler.isStationary, isFalse);
 
-      // 35 segundos parado: transiciona para modo estacionário / economia
+      // 35 segundos parado: transiciona para modo estacionário (mantendo <= 1000ms para tempo quase real)
       final t2 = t0.add(const Duration(seconds: 35));
       sampler.updateSpeed(0.0, timestamp: t2);
       expect(sampler.isStationary, isTrue);
-      expect(sampler.recommendedIntervalMs, equals(3000));
-      expect(sampler.recommendedDistanceFilterMeters, equals(10));
+      expect(sampler.recommendedIntervalMs, equals(1000));
+      expect(sampler.recommendedDistanceFilterMeters, equals(2));
     });
 
     test('ao voltar a acelerar (>= 5 km/h) deve restaurar imediatamente alta frequência', () {
