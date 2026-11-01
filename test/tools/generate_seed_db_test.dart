@@ -78,5 +78,18 @@ void main() {
       expect(meta.first['value'], equals('OpenStreetMap / Dados Abertos Brasil'));
       db.close();
     });
+
+    test('BUG REGRESSÃO: deve carregar base nacional expandida (> 1500 POIs) a partir de sentinela_pois_brasil.json', () async {
+      final count = await generateSeedDatabase(
+        outputPath: dbPath,
+        jsonSourcePath: 'assets/db/sentinela_pois_brasil.json',
+      );
+
+      expect(count, greaterThan(1500));
+      final db = sqlite3.open(dbPath);
+      final totalResult = db.select("SELECT COUNT(*) as count FROM pois;");
+      expect(totalResult.first['count'], equals(count));
+      db.close();
+    });
   });
 }

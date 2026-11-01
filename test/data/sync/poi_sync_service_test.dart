@@ -364,5 +364,57 @@ void main() {
       expect(success, isTrue);
       expect(dbManager.getTotalCount(), 2);
     });
+
+    test('BUG REGRESSÃO: PoiSyncService deve conter defaultDirectReleaseUrl e priorizar release direta sobre Overpass', () async {
+      expect(PoiSyncService.defaultDirectReleaseUrl, contains('sentinela_pois_brasil.json'));
+
+      when(() => mockClient.get(
+            Uri.parse(PoiSyncService.defaultDirectReleaseUrl),
+            headers: any(named: 'headers'),
+          )).thenAnswer((_) async => http.Response(validOverpassJson, 200));
+
+      final service = PoiSyncService(db, httpClient: mockClient);
+      final success = await service.syncFromRemote();
+
+      expect(success, isTrue);
+      expect(dbManager.getTotalCount(), 2);
+      verifyNever(() => mockClient.post(any(), body: any(named: 'body'), headers: any(named: 'headers')));
+      service.dispose();
+    });
+
+    test('BUG REGRESSÃO: Quando Overpass responder 502 Bad Gateway e não houver mirror alternativo, deve emitir mensagem descritiva de sobrecarga', () async {
+      when(() => mockClient.get(
+            any(),
+            headers: any(named: 'headers'),
+          )).thenAnswer((_) async => http.Response('Not Found', 404));
+
+      when(() => mockClient.post(
+            any(),
+            body: any(named: 'body'),
+            headers: any(named: 'headers'),
+          )).thenAnswer((_) async => http.Response('Bad Gateway', 502));
+
+      final progressEvents = <SyncProgress>[];
+      final service = PoiSyncService(
+        db,
+        httpClient: mockClient,
+        directReleaseUrl: 'https://example.com/not_found.json',
+        mirrorManager: SyncMirrorManager(
+          client: mockClient,
+          mirrors: ['https://overpass-api.de/api/interpreter'],
+        ),
+      );
+      service.progressStream.listen(progressEvents.add);
+
+      final success = await service.syncFromRemote();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(success, isFalse);
+
+      final errorEvents = progressEvents.where((e) => e.status == SyncStatus.error).toList();
+      expect(errorEvents, isNotEmpty);
+      expect(errorEvents.last.message, contains('502'));
+      service.dispose();
+    });
   });
 }
