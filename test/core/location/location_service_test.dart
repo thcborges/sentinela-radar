@@ -15,6 +15,9 @@ class FakeLocationService implements LocationService {
       StreamController<VehiclePosition>.broadcast();
 
   @override
+  int get defaultIntervalMs => 250;
+
+  @override
   Future<bool> isLocationServiceEnabled() async => serviceEnabled;
 
   @override

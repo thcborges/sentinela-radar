@@ -10,6 +10,9 @@ import 'package:sqlite3/sqlite3.dart';
 
 class FakeLocationService implements LocationService {
   @override
+  int get defaultIntervalMs => 250;
+
+  @override
   Future<bool> isLocationServiceEnabled() async => true;
 
   @override

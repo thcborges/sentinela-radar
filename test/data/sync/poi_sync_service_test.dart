@@ -210,6 +210,51 @@ void main() {
       wifiSyncService.dispose();
     });
 
+    test('syncFromRemote deve permitir sincronização em dados móveis quando requireWifi for false mesmo com Wi-Fi desconectado', () async {
+      final mockConn = MockConnectivityChecker();
+      when(() => mockConn.isWifiConnected()).thenAnswer((_) async => false);
+      when(() => mockClient.post(
+            any(),
+            body: any(named: 'body'),
+            headers: any(named: 'headers'),
+          )).thenAnswer((_) async => http.Response(validOverpassJson, 200));
+
+      final mobileSyncService = PoiSyncService(
+        db,
+        httpClient: mockClient,
+        connectivityChecker: mockConn,
+      );
+
+      final success = await mobileSyncService.syncFromRemote(requireWifi: false);
+      expect(success, isTrue, reason: 'requireWifi: false deve permitir sincronização via dados móveis');
+
+      mobileSyncService.dispose();
+    });
+
+    test('syncFromRemote deve priorizar directReleaseUrl via GET antes dos espelhos Overpass', () async {
+      when(() => mockClient.get(
+            Uri.parse('https://example.com/pois.json'),
+            headers: any(named: 'headers'),
+          )).thenAnswer((_) async => http.Response(validOverpassJson, 200));
+
+      final directSyncService = PoiSyncService(
+        db,
+        httpClient: mockClient,
+        directReleaseUrl: 'https://example.com/pois.json',
+      );
+
+      final success = await directSyncService.syncFromRemote();
+      expect(success, isTrue);
+      expect(dbManager.getTotalCount(), equals(2));
+      verify(() => mockClient.get(
+            Uri.parse('https://example.com/pois.json'),
+            headers: any(named: 'headers'),
+          )).called(1);
+      verifyNever(() => mockClient.post(any(), body: any(named: 'body')));
+
+      directSyncService.dispose();
+    });
+
     test('construtor padrão sem httpClient deve criar e descartar client próprio com sucesso', () {
       final standalone = PoiSyncService(db);
       expect(standalone, isNotNull);

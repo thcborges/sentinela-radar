@@ -104,6 +104,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {}
 
     _stats = Map<String, int>.from(widget.initialStats);
+    if ((_stats.isEmpty || _stats.values.every((v) => v == 0)) && widget.dashboardCubit != null) {
+      final cubitStats = widget.dashboardCubit!.state.poiStats;
+      if (cubitStats.values.any((v) => v > 0)) {
+        _stats = Map<String, int>.from(cubitStats);
+      }
+    }
     _overlayActive = widget.overlayService?.isOverlayOpen ?? false;
     _syncSubscription = widget.syncService.progressStream.listen((progress) {
       if (mounted) {
