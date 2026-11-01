@@ -330,6 +330,22 @@ class DashboardCubit extends Cubit<DashboardState> {
       return;
     }
 
+    // Emissão imediata de telemetria (velocímetro e rumo) para resposta em tempo quase real,
+    // eliminando o atraso de espera pelas operações assíncronas de banco de dados SQLite R*Tree.
+    if (position.speedKmh != state.currentSpeedKmh ||
+        position.bearing != state.currentBearing ||
+        !state.isGpsFixValid ||
+        state.deadReckoningStatus != drStatus) {
+      emit(state.copyWith(
+        currentSpeedKmh: position.speedKmh,
+        currentBearing: position.bearing,
+        isGpsFixValid: true,
+        lastPosition: position,
+        isDaytime: isDay,
+        deadReckoningStatus: drStatus,
+      ));
+    }
+
     // 1. Busca POIs próximos via R*Tree Bounding Box e Haversine (raio de 1200m)
     final nearbyFromDb = await _repository.findNearbyPois(
       latitude: position.latitude,

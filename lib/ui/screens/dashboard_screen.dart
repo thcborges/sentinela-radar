@@ -71,7 +71,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     try {
       _locationSubscription = widget.locationService!
-          .getPositionStream()
+          .getPositionStream(
+            distanceFilterMeters: 0,
+            intervalMs: 1000,
+          )
           .listen(
             (pos) {
               if (mounted) {

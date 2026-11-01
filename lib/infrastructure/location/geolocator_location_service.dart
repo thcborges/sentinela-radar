@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../domain/models/poi_model.dart';
 import 'location_service_interface.dart';
@@ -43,14 +44,30 @@ class GeolocatorLocationService implements LocationService {
 
   @override
   Stream<VehiclePosition> getPositionStream({
-    int distanceFilterMeters = 2,
+    int distanceFilterMeters = 0,
     int intervalMs = 1000,
   }) {
-    final settings = LocationSettings(
-      accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: distanceFilterMeters,
-      timeLimit: null,
-    );
+    final LocationSettings settings;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      settings = AndroidSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: distanceFilterMeters,
+        intervalDuration: Duration(milliseconds: intervalMs),
+      );
+    } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+      settings = AppleSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: distanceFilterMeters,
+        activityType: ActivityType.automotiveNavigation,
+        pauseLocationUpdatesAutomatically: false,
+      );
+    } else {
+      settings = LocationSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: distanceFilterMeters,
+        timeLimit: null,
+      );
+    }
 
     return _geo.getPositionStream(locationSettings: settings).map((pos) {
       final speedMs = pos.speed >= 0 ? pos.speed : 0.0;
