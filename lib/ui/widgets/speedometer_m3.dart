@@ -29,111 +29,124 @@ class SpeedometerM3 extends StatelessWidget {
 
     return AspectRatio(
       aspectRatio: 1.0,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Anel dinâmico do velocímetro
-          CustomPaint(
-            key: const Key('speedometer_ring_painter'),
-            size: const Size(double.infinity, double.infinity),
-            painter: _SpeedometerRingPainter(
-              progress: isGpsFixValid ? (speedKmh / maxSpeed).clamp(0.0, 1.0) : 0.0,
-              trackColor: trackColor,
-              activeColor: alertColor,
-              isHighContrast: isHighContrast,
-            ),
-          ),
-
-          // Mostrador Central (Velocidade ou aviso de GPS)
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween<double>(
+          begin: isGpsFixValid ? speedKmh : 0.0,
+          end: isGpsFixValid ? speedKmh : 0.0,
+        ),
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        builder: (context, animatedSpeed, child) {
+          final ringProgress = isGpsFixValid
+              ? (animatedSpeed / maxSpeed).clamp(0.0, 1.0)
+              : 0.0;
+          return Stack(
+            alignment: Alignment.center,
             children: [
-              if (!isGpsFixValid) ...[
-                const Icon(
-                  Icons.gps_not_fixed_rounded,
-                  color: SentinelaTheme.alertWarning,
-                  size: 40,
+              // Anel dinâmico do velocímetro com interpolação fluida
+              CustomPaint(
+                key: const Key('speedometer_ring_painter'),
+                size: const Size(double.infinity, double.infinity),
+                painter: _SpeedometerRingPainter(
+                  progress: ringProgress,
+                  trackColor: trackColor,
+                  activeColor: alertColor,
+                  isHighContrast: isHighContrast,
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Buscando GPS...',
-                  style: TextStyle(
-                    color: Color(0xFFB0B0B0),
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ] else ...[
-                Semantics(
-                  label: 'Velocímetro',
-                  value: '${speedKmh.round()} km/h',
-                  excludeSemantics: true,
-                  child: Column(
-                    children: [
-                      Text(
-                        speedKmh.round().toString(),
-                        style: isHighContrast
-                            ? SentinelaTheme.speedTextStyle.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
-                              )
-                            : SentinelaTheme.speedTextStyle,
-                      ),
-                      Text(
-                        'km/h',
-                        style: TextStyle(
-                          color: isHighContrast ? Colors.white70 : const Color(0xFF8E8E8E),
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
 
-              const SizedBox(height: 12),
-
-              // Placa de limite de velocidade da via (Sinalização R-19 Brasileira)
-              if (speedLimit != null)
-                Semantics(
-                  label: 'Velocidade máxima permitida',
-                  value: '$speedLimit km/h',
-                  excludeSemantics: true,
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFFD32F2F),
-                        width: isHighContrast ? 5.5 : 4.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.4),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+              // Mostrador Central (Velocidade ou aviso de GPS)
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (!isGpsFixValid) ...[
+                    const Icon(
+                      Icons.gps_not_fixed_rounded,
+                      color: SentinelaTheme.alertWarning,
+                      size: 40,
                     ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      speedLimit.toString(),
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5,
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Buscando GPS...',
+                      style: TextStyle(
+                        color: Color(0xFFB0B0B0),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ),
-                ),
+                  ] else ...[
+                    Semantics(
+                      label: 'Velocímetro',
+                      value: '${speedKmh.round()} km/h',
+                      excludeSemantics: true,
+                      child: Column(
+                        children: [
+                          Text(
+                            speedKmh.round().toString(),
+                            style: isHighContrast
+                                ? SentinelaTheme.speedTextStyle.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                  )
+                                : SentinelaTheme.speedTextStyle,
+                          ),
+                          Text(
+                            'km/h',
+                            style: TextStyle(
+                              color: isHighContrast ? Colors.white70 : const Color(0xFF8E8E8E),
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 12),
+
+                  // Placa de limite de velocidade da via (Sinalização R-19 Brasileira)
+                  if (speedLimit != null)
+                    Semantics(
+                      label: 'Velocidade máxima permitida',
+                      value: '$speedLimit km/h',
+                      excludeSemantics: true,
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFFD32F2F),
+                            width: isHighContrast ? 5.5 : 4.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.4),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          speedLimit.toString(),
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }

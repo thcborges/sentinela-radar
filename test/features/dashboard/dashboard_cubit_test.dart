@@ -554,5 +554,25 @@ void main() {
 
       expect(cubit.state.alertStatus, AlertStatus.passed);
     });
+
+    test('loadInitialPoiStats deve carregar contagens reais da base SQLite e atualizar state.totalPoisCount e state.poiStats', () async {
+      when(() => mockRepo.getTotalCount()).thenAnswer((_) async => 42);
+      when(() => mockRepo.getCountByType()).thenAnswer((_) async => {
+        'radares': 25,
+        'semaforos': 10,
+        'lombadas': 5,
+        'pedagios': 2,
+      });
+
+      await cubit.loadInitialPoiStats();
+
+      expect(cubit.state.totalPoisCount, equals(42));
+      expect(cubit.state.poiStats['radares'], equals(25));
+      expect(cubit.state.poiStats['semaforos'], equals(10));
+      expect(cubit.state.poiStats['lombadas'], equals(5));
+      expect(cubit.state.poiStats['pedagios'], equals(2));
+      verify(() => mockRepo.getTotalCount()).called(1);
+      verify(() => mockRepo.getCountByType()).called(1);
+    });
   });
 }

@@ -518,6 +518,7 @@ void main() {
 
     testWidgets('deve exibir badge de túnel / dead reckoning quando ativado', (tester) async {
       final mockCubit = MockDashboardCubit();
+      when(() => mockCubit.loadInitialPoiStats()).thenAnswer((_) async {});
       when(() => mockCubit.state).thenReturn(
         const DashboardState(
           isGpsFixValid: true,
@@ -543,6 +544,7 @@ void main() {
 
     testWidgets('deve exibir badge de cluster multi-ponto quando houver múltiplos POIs colocalizados', (tester) async {
       final mockCubit = MockDashboardCubit();
+      when(() => mockCubit.loadInitialPoiStats()).thenAnswer((_) async {});
       final radar = const PoiPoint(id: 1, type: PoiType.fixedRadar, latitude: -23.55, longitude: -46.63);
       final bump = const PoiPoint(id: 2, type: PoiType.physicalSpeedBump, latitude: -23.5501, longitude: -46.63);
       final cluster = PoiCluster(

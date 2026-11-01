@@ -21,6 +21,9 @@ class MockPoiSyncService extends Mock implements PoiSyncService {}
 class MockGeolocatorPlatform extends Mock implements GeolocatorPlatform {}
 
 class RecordingLocationService implements LocationService {
+  @override
+  int get defaultIntervalMs => 250;
+
   int? lastDistanceFilterMeters;
   int? lastIntervalMs;
   final StreamController<VehiclePosition> controller =
@@ -40,7 +43,7 @@ class RecordingLocationService implements LocationService {
   @override
   Stream<VehiclePosition> getPositionStream({
     int distanceFilterMeters = 0,
-    int intervalMs = 1000,
+    int intervalMs = 250,
   }) {
     lastDistanceFilterMeters = distanceFilterMeters;
     lastIntervalMs = intervalMs;
@@ -72,7 +75,7 @@ void main() {
           .thenAnswer((_) => const Stream.empty());
     });
 
-    test('GeolocatorLocationService deve usar intervalMs <= 1000 e distanceFilter <= 0 por padrao', () {
+    test('GeolocatorLocationService deve usar intervalMs <= 250 e distanceFilter <= 0 por padrao para tempo quase instantaneo', () {
       final mockPlatform = MockGeolocatorPlatform();
       final service = GeolocatorLocationService(platform: mockPlatform);
 
@@ -89,6 +92,8 @@ void main() {
       expect(captured.distanceFilter, equals(0),
           reason: 'distanceFilter deve ser 0 para permitir atualizações de velocímetro em tempo quase real sem deslocamento mínimo');
       expect(captured.accuracy, equals(LocationAccuracy.bestForNavigation));
+      expect(service.defaultIntervalMs, lessThanOrEqualTo(250),
+          reason: 'intervalMs padrão deve ser <= 250ms (4 Hz) para tempo quase instantâneo');
     });
 
     test('AdaptiveGpsSampler deve manter intervalo recomendado <= 1000ms (1 segundo ou menos) mesmo em modo estacionario', () {
@@ -152,7 +157,7 @@ void main() {
       await cubit.close();
     });
 
-    testWidgets('DashboardScreen deve configurar getPositionStream com intervalMs <= 1000 e distanceFilter 0', (tester) async {
+    testWidgets('DashboardScreen deve configurar getPositionStream com intervalMs <= 250 e distanceFilter 0', (tester) async {
       final recordingLocation = RecordingLocationService();
       when(() => mockRepo.findNearbyPois(
             latitude: any(named: 'latitude'),
@@ -181,8 +186,8 @@ void main() {
 
       expect(recordingLocation.lastDistanceFilterMeters, equals(0),
           reason: 'DashboardScreen deve requisitar distanceFilterMeters: 0 para tempo quase real');
-      expect(recordingLocation.lastIntervalMs, lessThanOrEqualTo(1000),
-          reason: 'DashboardScreen deve requisitar intervalMs <= 1000ms');
+      expect(recordingLocation.lastIntervalMs, lessThanOrEqualTo(250),
+          reason: 'DashboardScreen deve requisitar intervalMs <= 250ms para tempo quase instantâneo');
 
       cubit.close();
     });

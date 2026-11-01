@@ -42,6 +42,7 @@ class PoiSyncService {
   final Database db;
   final http.Client _client;
   final String overpassUrl;
+  final String? directReleaseUrl;
   final bool _ownsClient;
   final NetworkConnectivityChecker? _connectivityChecker;
   final SyncMirrorManager? _mirrorManager;
@@ -53,6 +54,7 @@ class PoiSyncService {
     this.db, {
     http.Client? httpClient,
     this.overpassUrl = 'https://overpass-api.de/api/interpreter',
+    this.directReleaseUrl,
     NetworkConnectivityChecker? connectivityChecker,
     SyncMirrorManager? mirrorManager,
   })  : _client = httpClient ?? http.Client(),
@@ -75,7 +77,7 @@ class PoiSyncService {
   Future<bool> startInAppUpdate({bool requireWifi = false}) =>
       syncFromRemote(requireWifi: requireWifi);
 
-  /// Dispara a sincronização conectando ao endpoint Overpass API via rede.
+  /// Dispara a sincronização conectando ao endpoint de release direta ou Overpass API via rede.
   Future<bool> syncFromRemote({
     bool requireWifi = false,
     String? customQuery,
@@ -91,6 +93,27 @@ class PoiSyncService {
       }
     }
 
+    // 1. Tenta download de release pré-compilada rápida se configurada
+    if (directReleaseUrl != null) {
+      try {
+        _progressController.add(const SyncProgress(
+          status: SyncStatus.downloading,
+          message: 'Baixando release direta da base de POIs...',
+          progress: 0.2,
+        ));
+        final response = await _client.get(
+          Uri.parse(directReleaseUrl!),
+          headers: {'User-Agent': 'Sentinela/1.0 (Mobile Direct Sync)'},
+        ).timeout(const Duration(minutes: 2));
+
+        if (response.statusCode == 200) {
+          return await _processAndCommit(response.body);
+        }
+      } catch (_) {
+        // Fallback automático para consulta Overpass caso a release direta falhe
+      }
+    }
+
     _progressController.add(const SyncProgress(
       status: SyncStatus.downloading,
       message: 'Conectando e baixando dados abertos do Brasil...',
@@ -98,16 +121,15 @@ class PoiSyncService {
     ));
 
     const defaultQuery = '''
-    [out:json][timeout:300];
-    area["ISO3166-1"="BR"]->.brazil;
+    [out:json][timeout:180];
     (
-      node["highway"="speed_camera"](area.brazil);
-      node["enforcement"="maxspeed"](area.brazil);
-      node["enforcement"="red_light"](area.brazil);
-      node["camera:traffic_signals"="yes"](area.brazil);
-      node["traffic_calming"~"bump|table|hump"](area.brazil);
-      node["barrier"="toll_booth"](area.brazil);
-      node["highway"="toll_gantry"](area.brazil);
+      node["highway"="speed_camera"](-33.75,-73.99,5.27,-34.79);
+      node["enforcement"="maxspeed"](-33.75,-73.99,5.27,-34.79);
+      node["enforcement"="red_light"](-33.75,-73.99,5.27,-34.79);
+      node["camera:traffic_signals"="yes"](-33.75,-73.99,5.27,-34.79);
+      node["traffic_calming"~"bump|table|hump"](-33.75,-73.99,5.27,-34.79);
+      node["barrier"="toll_booth"](-33.75,-73.99,5.27,-34.79);
+      node["highway"="toll_gantry"](-33.75,-73.99,5.27,-34.79);
     );
     out body;
     ''';

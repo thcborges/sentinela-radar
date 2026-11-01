@@ -18,7 +18,7 @@ class SeedDatabaseLoader {
     final tempFile = File('$targetPath.tmp');
     try {
       final targetFile = File(targetPath);
-      if (await targetFile.exists()) {
+      if (await targetFile.exists() && (await targetFile.length()) > 0) {
         // Limpa resíduo órfão se o banco já foi instalado com sucesso
         if (await tempFile.exists()) {
           try {

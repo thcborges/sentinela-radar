@@ -54,6 +54,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       widget.wakelockManager?.enable();
     } catch (_) {}
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        try {
+          context.read<DashboardCubit>().loadInitialPoiStats();
+        } catch (_) {}
+      }
+    });
+
     _initLocationTracking();
   }
 
@@ -73,7 +81,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _locationSubscription = widget.locationService!
           .getPositionStream(
             distanceFilterMeters: 0,
-            intervalMs: 1000,
+            intervalMs: 250,
           )
           .listen(
             (pos) {
@@ -165,9 +173,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         overlayService: widget.overlayService,
                         backupService: widget.backupService,
                         initialPreferences: cubit.alertMachine.preferences,
-                        initialStats: {
-                          'radares': cubit.state.totalPoisCount,
-                        },
+                        initialStats: cubit.state.poiStats.values.any((c) => c > 0)
+                            ? cubit.state.poiStats
+                            : {
+                                'radares': cubit.state.totalPoisCount,
+                                'semaforos': 0,
+                                'lombadas': 0,
+                                'pedagios': 0,
+                              },
                       ),
                     ),
                   );
