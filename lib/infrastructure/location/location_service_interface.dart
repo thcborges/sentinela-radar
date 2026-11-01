@@ -22,8 +22,9 @@ abstract class LocationService {
   Future<LocationPermissionStatus> requestPermission();
 
   /// Retorna um fluxo em tempo real de coordenadas de telemetria veicular.
+  /// Por padrão utiliza filtro de deslocamento zero (tempo quase real) e cadência de 1000ms.
   Stream<VehiclePosition> getPositionStream({
-    int distanceFilterMeters = 2,
+    int distanceFilterMeters = 0,
     int intervalMs = 1000,
   });
 }
