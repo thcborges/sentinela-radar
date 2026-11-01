@@ -18,6 +18,7 @@ import 'package:sentinela/data/database/seed_database_loader.dart';
 import 'package:sentinela/data/repository/custom_poi_repository.dart';
 import 'package:sentinela/data/repository/poi_repository.dart';
 import 'package:sentinela/data/sync/poi_sync_service.dart';
+import 'package:sentinela/data/sync/sync_mirror_manager.dart';
 import 'package:sentinela/features/dashboard/bloc/dashboard_cubit.dart';
 import 'package:sentinela/features/dashboard/screens/dashboard_screen.dart';
 import 'package:sentinela/features/overlay/services/overlay_service.dart';
@@ -185,6 +186,7 @@ class _SentinelaAppState extends State<SentinelaApp> {
     _syncService = PoiSyncService(
       _rawDb,
       connectivityChecker: widget.connectivityChecker ?? PlatformConnectivityChecker(),
+      mirrorManager: SyncMirrorManager(),
     );
 
     _passageRepository = PassageRepository(_rawDb);

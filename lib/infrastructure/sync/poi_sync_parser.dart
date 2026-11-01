@@ -47,22 +47,31 @@ abstract class PoiSyncParser {
 
       // Classificação do tipo de POI
       final PoiType type;
-      if (tags['barrier'] == 'toll_booth') {
+      if (tags['barrier'] == 'toll_booth' || tags['type'] == 'tollBooth') {
         type = PoiType.tollBooth;
-      } else if (tags['highway'] == 'toll_gantry') {
+      } else if (tags['highway'] == 'toll_gantry' || tags['type'] == 'freeFlowToll') {
         type = PoiType.freeFlowToll;
-      } else if (tags.containsKey('traffic_calming')) {
+      } else if (tags['amenity'] == 'police' || tags['highway'] == 'highway_patrol' || tags['type'] == 'highwayPatrol') {
+        type = PoiType.highwayPatrol;
+      } else if (tags['traffic_calming'] == 'electronic_bump' || tags['speed_camera:type'] == 'speed_display' || tags['type'] == 'electronicSpeedBump') {
+        type = PoiType.electronicSpeedBump;
+      } else if (tags.containsKey('traffic_calming') || tags['type'] == 'physicalSpeedBump') {
         type = PoiType.physicalSpeedBump;
       } else if (tags['enforcement'] == 'red_light' ||
           tags['camera:traffic_signals'] == 'yes' ||
           tags['red_light_camera'] == 'yes' ||
-          tags['speed_camera:type'] == 'traffic_lights') {
-        type = (speed != null)
+          tags['speed_camera:type'] == 'traffic_lights' ||
+          tags['type'] == 'trafficLightRadar' ||
+          tags['type'] == 'redLightCamera') {
+        type = (speed != null || tags['type'] == 'trafficLightRadar')
             ? PoiType.trafficLightRadar
             : PoiType.redLightCamera;
       } else {
         type = PoiType.fixedRadar;
       }
+
+      final city = tags['city']?.toString() ?? tags['addr:city']?.toString();
+      final state = tags['state']?.toString() ?? tags['addr:state']?.toString();
 
       results.add(PoiPoint(
         id: id,
@@ -73,7 +82,9 @@ abstract class PoiSyncParser {
         direction: direction,
         roadName: road,
         operator: operator,
-        source: 'OSM_OVERPASS',
+        city: city,
+        state: state,
+        source: tags['source']?.toString() ?? 'OSM_OVERPASS',
       ));
     }
 
