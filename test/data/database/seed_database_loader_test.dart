@@ -60,6 +60,29 @@ void main() {
       expect(targetFile.readAsBytesSync(), equals(existingBytes));
     });
 
+    test('BUG REGRESSÃO: se targetPath existir mas estiver vazio (0 bytes), deve sobrescrever com o asset de seed', () async {
+      final targetFile = File('${tempDir.path}/sentinela_brasil.db');
+      targetFile.writeAsBytesSync([]); // Arquivo vazio criado por falha prévia ou inicialização prematura
+      expect(targetFile.existsSync(), isTrue);
+      expect(targetFile.lengthSync(), equals(0));
+
+      final dummyBytes = Uint8List.fromList([10, 20, 30, 40]);
+      final byteData = ByteData.view(dummyBytes.buffer);
+
+      when(() => mockBundle.load('assets/db/sentinela_brasil.db'))
+          .thenAnswer((_) async => byteData);
+
+      final loader = SeedDatabaseLoader(bundle: mockBundle);
+      final installed = await loader.ensureDatabaseInstalled(
+        targetPath: targetFile.path,
+      );
+
+      expect(installed, isTrue);
+      verify(() => mockBundle.load('assets/db/sentinela_brasil.db')).called(1);
+      expect(targetFile.lengthSync(), greaterThan(0));
+      expect(targetFile.readAsBytesSync(), equals(dummyBytes));
+    });
+
     test('deve retornar false e tratar erro de IO graciosamente', () async {
       when(() => mockBundle.load(any())).thenThrow(Exception('Asset not found'));
 

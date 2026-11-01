@@ -47,6 +47,7 @@ class DashboardState extends Equatable {
   final List<SonarPoiItem> nearbySonarPois;
   final bool isGpsFixValid;
   final int totalPoisCount;
+  final Map<String, int> poiStats;
   final Set<PoiType> enabledPoiTypes;
   final bool isHudMirrorMode;
   final SectionControlState sectionControlState;
@@ -72,6 +73,12 @@ class DashboardState extends Equatable {
     this.nearbySonarPois = const [],
     this.isGpsFixValid = false,
     this.totalPoisCount = 0,
+    this.poiStats = const {
+      'radares': 0,
+      'semaforos': 0,
+      'lombadas': 0,
+      'pedagios': 0,
+    },
     this.isHudMirrorMode = false,
     this.sectionControlState = const SectionControlState(),
     this.lastPosition,
@@ -118,6 +125,7 @@ class DashboardState extends Equatable {
     List<SonarPoiItem>? nearbySonarPois,
     bool? isGpsFixValid,
     int? totalPoisCount,
+    Map<String, int>? poiStats,
     Set<PoiType>? enabledPoiTypes,
     bool? isHudMirrorMode,
     SectionControlState? sectionControlState,
@@ -144,6 +152,7 @@ class DashboardState extends Equatable {
       nearbySonarPois: nearbySonarPois ?? this.nearbySonarPois,
       isGpsFixValid: isGpsFixValid ?? this.isGpsFixValid,
       totalPoisCount: totalPoisCount ?? this.totalPoisCount,
+      poiStats: poiStats ?? this.poiStats,
       enabledPoiTypes: enabledPoiTypes ?? this.enabledPoiTypes,
       isHudMirrorMode: isHudMirrorMode ?? this.isHudMirrorMode,
       sectionControlState: sectionControlState ?? this.sectionControlState,
@@ -172,6 +181,7 @@ class DashboardState extends Equatable {
         nearbySonarPois,
         isGpsFixValid,
         totalPoisCount,
+        poiStats,
         enabledPoiTypes,
         isHudMirrorMode,
         sectionControlState,
@@ -508,6 +518,18 @@ class DashboardCubit extends Cubit<DashboardState> {
   /// Define contagem inicial de POIs na base para exibição de métricas.
   void setInitialPoiCount(int count) {
     emit(state.copyWith(totalPoisCount: count));
+  }
+
+  /// Carrega as estatísticas consolidadas de POIs da base de dados local SQLite.
+  Future<void> loadInitialPoiStats() async {
+    try {
+      final total = await _repository.getTotalCount();
+      final stats = await _repository.getCountByType();
+      emit(state.copyWith(
+        totalPoisCount: total,
+        poiStats: stats,
+      ));
+    } catch (_) {}
   }
 
   /// Reseta manualmente o monitoramento do radar de trecho ativo.

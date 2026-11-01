@@ -21,10 +21,13 @@ abstract class LocationService {
   /// Solicita ao usuário a permissão de acesso à localização.
   Future<LocationPermissionStatus> requestPermission();
 
+  /// Retorna o intervalo padrão de amostragem em milissegundos (250ms = 4 Hz).
+  int get defaultIntervalMs => 250;
+
   /// Retorna um fluxo em tempo real de coordenadas de telemetria veicular.
-  /// Por padrão utiliza filtro de deslocamento zero (tempo quase real) e cadência de 1000ms.
+  /// Por padrão utiliza filtro de deslocamento zero (tempo quase real) e cadência de 250ms (4 Hz).
   Stream<VehiclePosition> getPositionStream({
     int distanceFilterMeters = 0,
-    int intervalMs = 1000,
+    int intervalMs = 250,
   });
 }

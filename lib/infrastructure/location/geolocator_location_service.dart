@@ -43,9 +43,12 @@ class GeolocatorLocationService implements LocationService {
   }
 
   @override
+  int get defaultIntervalMs => 250;
+
+  @override
   Stream<VehiclePosition> getPositionStream({
     int distanceFilterMeters = 0,
-    int intervalMs = 1000,
+    int intervalMs = 250,
   }) {
     final LocationSettings settings;
     if (defaultTargetPlatform == TargetPlatform.android) {
