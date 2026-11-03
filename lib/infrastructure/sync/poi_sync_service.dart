@@ -39,6 +39,9 @@ class SyncProgress extends Equatable {
 /// Serviço de sincronização e atualização sob demanda da base de POIs
 /// com transação atômica em staging tables e rollback automático.
 class PoiSyncService {
+  static const String defaultDirectReleaseUrl =
+      'https://raw.githubusercontent.com/thcborges/sentinela-radar/main/assets/db/sentinela_pois_brasil.json';
+
   final Database db;
   final http.Client _client;
   final String overpassUrl;
@@ -54,13 +57,13 @@ class PoiSyncService {
     this.db, {
     http.Client? httpClient,
     this.overpassUrl = 'https://overpass-api.de/api/interpreter',
-    this.directReleaseUrl,
+    this.directReleaseUrl = defaultDirectReleaseUrl,
     NetworkConnectivityChecker? connectivityChecker,
     SyncMirrorManager? mirrorManager,
   })  : _client = httpClient ?? http.Client(),
         _ownsClient = httpClient == null,
         _connectivityChecker = connectivityChecker,
-        _mirrorManager = mirrorManager;
+        _mirrorManager = mirrorManager ?? (httpClient != null ? SyncMirrorManager(client: httpClient) : null);
 
   /// Stream reativo para acompanhamento na tela de Configurações em tempo real.
   Stream<SyncProgress> get progressStream => _progressController.stream;
@@ -127,7 +130,6 @@ class PoiSyncService {
       node["enforcement"="maxspeed"](-33.75,-73.99,5.27,-34.79);
       node["enforcement"="red_light"](-33.75,-73.99,5.27,-34.79);
       node["camera:traffic_signals"="yes"](-33.75,-73.99,5.27,-34.79);
-      node["traffic_calming"~"bump|table|hump"](-33.75,-73.99,5.27,-34.79);
       node["barrier"="toll_booth"](-33.75,-73.99,5.27,-34.79);
       node["highway"="toll_gantry"](-33.75,-73.99,5.27,-34.79);
     );
@@ -150,18 +152,25 @@ class PoiSyncService {
       }
 
       if (response.statusCode != 200) {
+        final reason = response.statusCode == 502
+            ? 'Servidores Overpass temporariamente sobrecarregados (502 Bad Gateway). Tente novamente em instantes.'
+            : 'Falha HTTP ${response.statusCode} ao consultar dados abertos.';
         _progressController.add(SyncProgress(
           status: SyncStatus.error,
-          message: 'Falha HTTP ${response.statusCode} ao consultar dados abertos.',
+          message: reason,
         ));
         return false;
       }
 
       return await _processAndCommit(response.body);
     } catch (e) {
+      final errorStr = e.toString();
+      final msg = errorStr.contains('502')
+          ? 'Servidores Overpass temporariamente sobrecarregados (502 Bad Gateway). Tente novamente.'
+          : 'Erro durante o download da base: $e';
       _progressController.add(SyncProgress(
         status: SyncStatus.error,
-        message: 'Erro durante o download da base: $e',
+        message: msg,
       ));
       return false;
     }

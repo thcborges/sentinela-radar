@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:sentinela/core/models/poi_model.dart';
 import 'package:sentinela/data/database/database_manager.dart';
+import 'package:sentinela/data/sync/poi_sync_parser.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 /// Amostra inicial representativa da malha viária brasileira para pré-embarque
@@ -100,6 +101,7 @@ const List<PoiPoint> defaultNationalSeed = [
 Future<int> generateSeedDatabase({
   required String outputPath,
   List<PoiPoint>? pois,
+  String? jsonSourcePath,
 }) async {
   final targetFile = File(outputPath);
   if (targetFile.existsSync()) {
@@ -112,7 +114,22 @@ Future<int> generateSeedDatabase({
   final dbManager = DatabaseManager(rawDb);
   dbManager.initializeSchema();
 
-  final pointsToInsert = pois ?? defaultNationalSeed;
+  List<PoiPoint> pointsToInsert = pois ?? [];
+  if (pointsToInsert.isEmpty) {
+    final candidateJson = jsonSourcePath ?? 'assets/db/sentinela_pois_brasil.json';
+    if (File(candidateJson).existsSync()) {
+      try {
+        final jsonStr = File(candidateJson).readAsStringSync();
+        pointsToInsert = PoiSyncParser.parseJsonPayload(jsonStr);
+      } catch (_) {
+        pointsToInsert = [];
+      }
+    }
+  }
+  if (pointsToInsert.isEmpty) {
+    pointsToInsert = defaultNationalSeed;
+  }
+
   dbManager.insertPoisBatch(pointsToInsert);
 
   // Salva metadados da base

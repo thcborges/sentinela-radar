@@ -36,32 +36,56 @@ class FederalOpenDataParser {
 
       final delimiter = _detectDelimiter(lines.first);
       final header = _splitCsvLine(lines.first, delimiter).map((e) => e.toLowerCase()).toList();
-      final idIdx = header.indexOf('id');
+      var idIdx = header.indexOf('id');
+      if (idIdx == -1) {
+        idIdx = header.indexWhere((h) => h.contains('código') || h.contains('codigo') || h.contains('identifica'));
+      }
       final ufIdx = header.indexOf('uf');
       final rodoviaIdx = header.indexOf('rodovia');
       final kmIdx = header.indexOf('km');
-      final munIdx = header.indexOf('municipio');
-      final tipoIdx = header.indexOf('tipo_equipamento');
+      var munIdx = header.indexOf('municipio');
+      if (munIdx == -1) {
+        munIdx = header.indexWhere((h) => h.contains('munic'));
+      }
+      var tipoIdx = header.indexOf('tipo_equipamento');
+      if (tipoIdx == -1) {
+        tipoIdx = header.indexOf('tipo');
+      }
       final velIdx = header.indexOf('velocidade_regulamentada');
-      final latIdx = header.indexOf('latitude');
-      final lonIdx = header.indexOf('longitude');
+      var latIdx = header.indexOf('latitude');
+      var lonIdx = header.indexOf('longitude');
+      final coordIdx = header.indexWhere((h) => h.contains('coordenadas') || h.contains('lat/long'));
       final sentidoIdx = header.indexOf('sentido');
 
-      if (latIdx == -1 || lonIdx == -1) return [];
+      if ((latIdx == -1 || lonIdx == -1) && coordIdx == -1) return [];
 
       final pois = <PoiPoint>[];
       for (var i = 1; i < lines.length; i++) {
         final line = lines[i].trim();
         if (line.isEmpty) continue;
         final cols = _splitCsvLine(line, delimiter);
-        if (cols.length <= latIdx || cols.length <= lonIdx) continue;
+
+        double? lat;
+        double? lon;
+
+        if (coordIdx != -1 && cols.length > coordIdx) {
+          final coordStr = cols[coordIdx];
+          final parts = coordStr.split(RegExp(r'[/]'));
+          if (parts.length >= 2) {
+            lat = _parseDouble(parts[0]);
+            lon = _parseDouble(parts[1]);
+          }
+        }
+        if (lat == null && latIdx != -1 && cols.length > latIdx) {
+          lat = _parseDouble(cols[latIdx]);
+        }
+        if (lon == null && lonIdx != -1 && cols.length > lonIdx) {
+          lon = _parseDouble(cols[lonIdx]);
+        }
+        if (lat == null || lon == null) continue;
 
         final rawId = idIdx != -1 && idIdx < cols.length ? _parseInt(cols[idIdx]) : null;
         final id = rawId ?? (100000 + i);
-
-        final lat = _parseDouble(cols[latIdx]);
-        final lon = _parseDouble(cols[lonIdx]);
-        if (lat == null || lon == null) continue;
 
         final uf = ufIdx != -1 && ufIdx < cols.length ? cols[ufIdx] : null;
         final rodovia = rodoviaIdx != -1 && rodoviaIdx < cols.length ? cols[rodoviaIdx] : '';
@@ -72,7 +96,12 @@ class FederalOpenDataParser {
         final sentido = sentidoIdx != -1 && sentidoIdx < cols.length ? cols[sentidoIdx] : null;
 
         final poiType = _classifyDnitType(tipoStr);
-        final roadName = km.isNotEmpty ? '$rodovia km $km'.trim() : rodovia;
+        var formattedRoad = rodovia;
+        if (RegExp(r'^\d+$').hasMatch(rodovia)) {
+          formattedRoad = 'BR-$rodovia';
+        }
+        final cleanKm = km.replaceAll(',', '.');
+        final roadName = cleanKm.isNotEmpty ? '$formattedRoad km $cleanKm'.trim() : formattedRoad;
         final toleranceAngle = (sentido != null && sentido.toLowerCase().contains('ambos')) ? 180.0 : 35.0;
 
         pois.add(PoiPoint(
@@ -128,7 +157,10 @@ class FederalOpenDataParser {
       final concIdx = header.indexOf('concessionaria');
       final rodoviaIdx = header.indexOf('rodovia');
       final kmIdx = header.indexOf('km');
-      final munIdx = header.indexOf('municipio');
+      var munIdx = header.indexOf('municipio');
+      if (munIdx == -1) {
+        munIdx = header.indexWhere((h) => h.contains('munic'));
+      }
       final ufIdx = header.indexOf('uf');
       final tipoIdx = header.indexOf('tipo_praca');
       final tarifaIdx = header.indexOf('tarifa_carro');
@@ -302,9 +334,12 @@ class FederalOpenDataParser {
   }
 
   static PoiType _classifyDnitType(String tipo) {
-    final lower = tipo.toLowerCase();
-    if (lower.contains('redutor') || lower.contains('lombada')) {
+    final lower = tipo.toLowerCase().trim();
+    if (lower == 'rev' || lower.contains('redutor') || lower.contains('lombada')) {
       return PoiType.electronicSpeedBump;
+    }
+    if (lower == 'cem' || lower.contains('misto') || lower.contains('semaforo') || lower.contains('semáforo')) {
+      return PoiType.trafficLightRadar;
     }
     return PoiType.fixedRadar;
   }

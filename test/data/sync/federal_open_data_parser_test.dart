@@ -96,6 +96,37 @@ void main() {
       expect(pois[1].state, 'PR');
     });
 
+    test('BUG REGRESSÃO: deve parsear CSV oficial do DNIT PNCV com coluna Coordenadas (Lat/Long) e siglas REV/CEV/CEM', () {
+      const officialDnitCsv = '''Código Identificação;UF;Rodovia;Km;Município;Faixas;Tipo;Marca / Modelo;Edital / Lote (Operadora);Início Operação;Coordenadas (Lat/Long);Cód. ET;Cód. EV
+ACB22010002;AC;364;124,4;RIO BRANCO;P-C-1, P-C-2;REV;Vizentec / DTV 102;168.2016 / 10;10/08/2022;-10,011417 / -67,794678;ET.1912.AC0001;EV.1910.AC0016
+SPB18080001;SP;116;230;SAO PAULO;P-C-1;CEV;Consilux;168.2016 / 14;16/01/2019;-23,550520 / -46,633308;ET.1806;EV.1805
+RJB18080002;RJ;101;15;NITEROI;P-C-1;CEM;Consilux;168.2016 / 14;16/01/2019;-22,880000 / -43,120000;ET.1806;EV.1805
+''';
+
+      final pois = FederalOpenDataParser.parseDnitCsv(officialDnitCsv);
+
+      expect(pois.length, 3);
+      // REV -> electronicSpeedBump
+      expect(pois[0].type, PoiType.electronicSpeedBump);
+      expect(pois[0].latitude, closeTo(-10.011417, 0.0001));
+      expect(pois[0].longitude, closeTo(-67.794678, 0.0001));
+      expect(pois[0].state, 'AC');
+      expect(pois[0].city, 'RIO BRANCO');
+      expect(pois[0].roadName, 'BR-364 km 124.4');
+
+      // CEV -> fixedRadar
+      expect(pois[1].type, PoiType.fixedRadar);
+      expect(pois[1].latitude, closeTo(-23.550520, 0.0001));
+      expect(pois[1].longitude, closeTo(-46.633308, 0.0001));
+      expect(pois[1].state, 'SP');
+
+      // CEM -> trafficLightRadar
+      expect(pois[2].type, PoiType.trafficLightRadar);
+      expect(pois[2].latitude, closeTo(-22.880000, 0.0001));
+      expect(pois[2].longitude, closeTo(-43.120000, 0.0001));
+      expect(pois[2].state, 'RJ');
+    });
+
     test('deve parsear JSON CKAN da ANTT de praças e pórticos Free Flow', () {
       const anttJson = '''
       {
