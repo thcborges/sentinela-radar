@@ -14,6 +14,7 @@ import '../math/solar_calculator.dart';
 import '../models/poi_model.dart';
 import '../models/user_reported_poi.dart';
 import '../models/vehicle_profile.dart';
+import '../sync/dataset_update_checker.dart';
 import 'package:sentinela/infrastructure/platform/haptic_feedback_engine.dart';
 import 'package:sentinela/infrastructure/platform/live_activity_service.dart';
 import 'package:sentinela/infrastructure/repositories/custom_poi_repository.dart';
@@ -63,6 +64,9 @@ class DashboardState extends Equatable {
   final AppLanguage language;
   final bool highContrastMode;
   final CarConnectionStatus carConnectionStatus;
+  final bool isDatabaseEmpty;
+  final bool isUpdateAvailable;
+  final DateTime? lastDatabaseUpdate;
 
   const DashboardState({
     this.currentSpeedKmh = 0.0,
@@ -93,6 +97,9 @@ class DashboardState extends Equatable {
     this.language = AppLanguage.pt,
     this.highContrastMode = false,
     this.carConnectionStatus = CarConnectionStatus.disconnected,
+    this.isDatabaseEmpty = false,
+    this.isUpdateAvailable = false,
+    this.lastDatabaseUpdate,
     this.enabledPoiTypes = const {
       PoiType.fixedRadar,
       PoiType.mobileRadar,
@@ -142,6 +149,10 @@ class DashboardState extends Equatable {
     AppLanguage? language,
     bool? highContrastMode,
     CarConnectionStatus? carConnectionStatus,
+    bool? isDatabaseEmpty,
+    bool? isUpdateAvailable,
+    DateTime? lastDatabaseUpdate,
+    bool clearLastDatabaseUpdate = false,
   }) {
     return DashboardState(
       currentSpeedKmh: currentSpeedKmh ?? this.currentSpeedKmh,
@@ -168,6 +179,9 @@ class DashboardState extends Equatable {
       language: language ?? this.language,
       highContrastMode: highContrastMode ?? this.highContrastMode,
       carConnectionStatus: carConnectionStatus ?? this.carConnectionStatus,
+      isDatabaseEmpty: isDatabaseEmpty ?? this.isDatabaseEmpty,
+      isUpdateAvailable: isUpdateAvailable ?? this.isUpdateAvailable,
+      lastDatabaseUpdate: clearLastDatabaseUpdate ? null : (lastDatabaseUpdate ?? this.lastDatabaseUpdate),
     );
   }
 
@@ -197,6 +211,9 @@ class DashboardState extends Equatable {
         language,
         highContrastMode,
         carConnectionStatus,
+        isDatabaseEmpty,
+        isUpdateAvailable,
+        lastDatabaseUpdate,
       ];
 }
 
@@ -212,10 +229,12 @@ class DashboardCubit extends Cubit<DashboardState> {
   final PoiClusterEngine? _poiClusterEngine;
   final HapticFeedbackEngine _hapticEngine;
   final AutomotiveService? _automotiveService;
+  final DatasetUpdateChecker _updateChecker;
 
   DashboardCubit({
     required PoiRepository repository,
     required AlertMachine alertMachine,
+    DatasetUpdateChecker? datasetUpdateChecker,
     LiveActivityService? liveActivityService,
     SectionControlMachine? sectionControlMachine,
     CustomPoiRepository? customPoiRepository,
@@ -225,6 +244,7 @@ class DashboardCubit extends Cubit<DashboardState> {
     AutomotiveService? automotiveService,
   })  : _repository = repository,
         _alertMachine = alertMachine,
+        _updateChecker = datasetUpdateChecker ?? const DatasetUpdateChecker(),
         _liveActivityService = liveActivityService,
         _sectionControlMachine = sectionControlMachine,
         _customPoiRepository = customPoiRepository,
@@ -517,20 +537,50 @@ class DashboardCubit extends Cubit<DashboardState> {
 
   /// Define contagem inicial de POIs na base para exibição de métricas.
   void setInitialPoiCount(int count) {
-    emit(state.copyWith(totalPoisCount: count));
+    emit(state.copyWith(
+      totalPoisCount: count,
+      isDatabaseEmpty: count <= 0,
+    ));
   }
 
-  /// Carrega as estatísticas consolidadas de POIs da base de dados local SQLite.
-  Future<void> loadInitialPoiStats() async {
+  /// Carrega as estatísticas consolidadas de POIs da base de dados local SQLite
+  /// e avalia se o banco está limpo ou se há atualização semanal pendente.
+  Future<void> loadInitialPoiStats({DateTime? now}) async {
     try {
       final total = await _repository.getTotalCount();
       final stats = await _repository.getCountByType();
+      String? lastUpdatedStr;
+      try {
+        lastUpdatedStr = await _repository.getMetadata('last_updated');
+      } catch (_) {}
+
+      DateTime? parsedLastUpdate;
+      if (lastUpdatedStr != null && lastUpdatedStr.isNotEmpty) {
+        try {
+          parsedLastUpdate = DateTime.parse(lastUpdatedStr);
+        } catch (_) {}
+      }
+
+      final isEmpty = _updateChecker.isDatabaseEmpty(totalPoisCount: total);
+      final hasUpdate = _updateChecker.isUpdateAvailable(
+        now: now,
+        lastUpdated: parsedLastUpdate,
+        totalPoisCount: total,
+      );
+
       emit(state.copyWith(
         totalPoisCount: total,
         poiStats: stats,
+        isDatabaseEmpty: isEmpty,
+        isUpdateAvailable: hasUpdate,
+        lastDatabaseUpdate: parsedLastUpdate,
       ));
     } catch (_) {}
   }
+
+  /// Reavalia o status da base de dados local após download ou sincronização.
+  Future<void> refreshDatabaseStatus({DateTime? now}) =>
+      loadInitialPoiStats(now: now);
 
   /// Reseta manualmente o monitoramento do radar de trecho ativo.
   void resetSectionControl() {

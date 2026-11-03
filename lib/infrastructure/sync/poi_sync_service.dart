@@ -40,6 +40,8 @@ class SyncProgress extends Equatable {
 /// com transação atômica em staging tables e rollback automático.
 class PoiSyncService {
   static const String defaultDirectReleaseUrl =
+      'https://github.com/thcborges/sentinela-radar/releases/download/data-latest/sentinela_pois_brasil.json';
+  static const String fallbackRawUrl =
       'https://raw.githubusercontent.com/thcborges/sentinela-radar/main/assets/db/sentinela_pois_brasil.json';
 
   final Database db;
@@ -96,12 +98,12 @@ class PoiSyncService {
       }
     }
 
-    // 1. Tenta download de release pré-compilada rápida se configurada
+    // 1. Tenta download de release pré-compilada mais recente no GitHub Releases
     if (directReleaseUrl != null) {
       try {
         _progressController.add(const SyncProgress(
           status: SyncStatus.downloading,
-          message: 'Baixando release direta da base de POIs...',
+          message: 'Baixando release mais recente da base de POIs...',
           progress: 0.2,
         ));
         final response = await _client.get(
@@ -113,7 +115,23 @@ class PoiSyncService {
           return await _processAndCommit(response.body);
         }
       } catch (_) {
-        // Fallback automático para consulta Overpass caso a release direta falhe
+        // Fallback para URL secundária raw
+      }
+    }
+
+    // 2. Fallback secundário no repositório GitHub raw caso o release tag ainda não tenha sido publicado
+    if (directReleaseUrl != fallbackRawUrl) {
+      try {
+        final fallbackResponse = await _client.get(
+          Uri.parse(fallbackRawUrl),
+          headers: {'User-Agent': 'Sentinela/1.0 (Mobile Fallback Sync)'},
+        ).timeout(const Duration(minutes: 2));
+
+        if (fallbackResponse.statusCode == 200) {
+          return await _processAndCommit(fallbackResponse.body);
+        }
+      } catch (_) {
+        // Prossegue para espelhos Overpass API
       }
     }
 
