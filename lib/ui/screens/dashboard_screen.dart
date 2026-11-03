@@ -46,6 +46,14 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   StreamSubscription<VehiclePosition>? _locationSubscription;
+  StreamSubscription<SyncProgress>? _syncSubscription;
+  SyncProgress? _currentSyncProgress;
+
+  bool get _isSyncing =>
+      _currentSyncProgress != null &&
+      (_currentSyncProgress!.status == SyncStatus.downloading ||
+          _currentSyncProgress!.status == SyncStatus.processing ||
+          _currentSyncProgress!.status == SyncStatus.saving);
 
   @override
   void initState() {
@@ -61,6 +69,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
         } catch (_) {}
       }
     });
+
+    _syncSubscription = widget.syncService.progressStream.listen(
+      (progress) {
+        if (!mounted) return;
+        setState(() {
+          _currentSyncProgress = progress;
+        });
+
+        if (progress.status == SyncStatus.success) {
+          try {
+            context.read<DashboardCubit>().refreshDatabaseStatus();
+          } catch (_) {}
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Base de dados atualizada com sucesso!'),
+              backgroundColor: SentinelaTheme.alertNormal,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        } else if (progress.status == SyncStatus.error) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(progress.message),
+              backgroundColor: SentinelaTheme.alertCritical,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      },
+      onError: (_) {},
+    );
 
     _initLocationTracking();
   }
@@ -99,6 +139,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void dispose() {
     _locationSubscription?.cancel();
+    _syncSubscription?.cancel();
     try {
       widget.wakelockManager?.disable();
     } catch (_) {}
@@ -210,6 +251,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               flex: 1,
                               child: Column(
                                 children: [
+                                  if (_buildDatabaseStatusBanner(state) != null)
+                                    _buildDatabaseStatusBanner(state)!,
                                   Expanded(
                                     child: SpeedometerM3(
                                       key: const Key('dashboard_speedometer'),
@@ -286,7 +329,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
 
                           _buildBadges(state),
-
+                          if (_buildDatabaseStatusBanner(state) != null)
+                            _buildDatabaseStatusBanner(state)!,
                           const SizedBox(height: 12),
 
                           // Banner de Radar de Trecho / Velocidade Média Ativo
@@ -437,6 +481,186 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
     );
+  }
+
+  Widget? _buildDatabaseStatusBanner(DashboardState state) {
+    if (state.isDatabaseEmpty) {
+      return Container(
+        key: const Key('dashboard_clean_install_banner'),
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: SentinelaTheme.surfaceContainerDark,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: SentinelaTheme.alertWarning.withValues(alpha: 0.6),
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Row(
+              children: [
+                Icon(
+                  Icons.cloud_download_rounded,
+                  color: SentinelaTheme.alertWarning,
+                  size: 24,
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Base de Radares Não Instalada',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'O aplicativo foi inicializado com a base limpa. Baixe os dados nacionais para ativar os alertas de velocidade, semáforos e pedágios.',
+              style: TextStyle(
+                color: Color(0xFFB0B0B0),
+                fontSize: 12,
+                height: 1.3,
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (_isSyncing) ...[
+              Text(
+                _currentSyncProgress?.message ?? 'Baixando base...',
+                style: const TextStyle(
+                  color: SentinelaTheme.alertNormal,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              LinearProgressIndicator(
+                value: _currentSyncProgress?.progress,
+                color: SentinelaTheme.alertNormal,
+                backgroundColor: const Color(0xFF333333),
+              ),
+            ] else ...[
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  key: const Key('dashboard_download_clean_db_button'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: SentinelaTheme.alertNormal,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.download_rounded, size: 18),
+                  label: const Text(
+                    'Baixar Base de Radares',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () => widget.syncService.startInAppUpdate(requireWifi: false),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    if (state.isUpdateAvailable) {
+      return Container(
+        key: const Key('dashboard_update_available_banner'),
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: SentinelaTheme.surfaceContainerDark,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: SentinelaTheme.alertInfo.withValues(alpha: 0.6),
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Row(
+              children: [
+                Icon(
+                  Icons.update_rounded,
+                  color: SentinelaTheme.alertInfo,
+                  size: 24,
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Atualização Semanal Disponível',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Nova base de radares publicada pela esteira semanal. Atualize para manter seus alertas precisos.',
+              style: TextStyle(
+                color: Color(0xFFB0B0B0),
+                fontSize: 12,
+                height: 1.3,
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (_isSyncing) ...[
+              Text(
+                _currentSyncProgress?.message ?? 'Atualizando dados...',
+                style: const TextStyle(
+                  color: SentinelaTheme.alertNormal,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              LinearProgressIndicator(
+                value: _currentSyncProgress?.progress,
+                color: SentinelaTheme.alertNormal,
+                backgroundColor: const Color(0xFF333333),
+              ),
+            ] else ...[
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  key: const Key('dashboard_update_db_button'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: SentinelaTheme.alertInfo,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.sync_rounded, size: 18),
+                  label: const Text(
+                    'Atualizar Base',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () => widget.syncService.startInAppUpdate(requireWifi: false),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    return null;
   }
 
   Widget _buildBadges(DashboardState state) {

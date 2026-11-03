@@ -1,0 +1,63 @@
+name: Publish Radar Datasets - Sentinela
+
+on:
+  schedule:
+    # Executa todo domingo às 03:00 UTC (00:00 Horário de Brasília)
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-dataset:
+    name: Compilar e Publicar Base de Radares (.db, .json, .csv)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Instalar Dependências
+        run: dart pub get
+
+      - name: Compilar Banco SQLite R*Tree, JSON e CSV
+        run: |
+          dart run tools/export_radar_datasets.dart --output-dir=build/datasets
+
+      - name: Validar Geração dos Artefatos
+        run: |
+          ls -la build/datasets/
+          test -s build/datasets/sentinela_brasil.db
+          test -s build/datasets/sentinela_pois_brasil.json
+          test -s build/datasets/sentinela_pois_brasil.csv
+          test -s build/datasets/SHA256SUMS.txt
+          cat build/datasets/SHA256SUMS.txt
+
+      - name: Publicar GitHub Release da Base de Dados (data-latest)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "data-latest"
+          name: "Base Nacional de Radares (Atualização Semanal)"
+          body: |
+            ## Conjunto de Dados de Fiscalização Eletrônica e Tráfego — Sentinela
+
+            Atualização semanal automatizada compilada a partir de dados abertos governamentais (DNIT PNCV, ANTT) e OpenStreetMap.
+
+            ### Artefatos Disponíveis:
+            * **`sentinela_brasil.db`**: Banco de dados SQLite com extensão espacial R\*Tree e índices espaciais pré-compilados.
+            * **`sentinela_pois_brasil.json`**: Base completa de POIs em formato JSON padronizado para sincronização in-app.
+            * **`sentinela_pois_brasil.csv`**: Base tabular completa em formato CSV para análise de dados e interoperabilidade.
+            * **`SHA256SUMS.txt`**: Hashes de integridade criptográfica de todos os artefatos.
+
+            *Esteira executada aos domingos às 03:00 UTC com margem de espera de 1-2 horas para consumo nos dispositivos.*
+          files: |
+            build/datasets/sentinela_brasil.db
+            build/datasets/sentinela_pois_brasil.json
+            build/datasets/sentinela_pois_brasil.csv
+            build/datasets/SHA256SUMS.txt
+          prerelease: false
