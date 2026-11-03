@@ -63,3 +63,39 @@ sequenceDiagram
     Note over Ativa: DROP pois; DROP pois_index;<br>ALTER TABLE pois_staging RENAME TO pois;<br>ALTER TABLE pois_index_staging RENAME TO pois_index;
     App->>Ativa: 4. Atualiza db_metadata com data e total_count
 ```
+
+---
+
+## 🚀 Esteira Automatizada de Datasets no GitHub Releases
+
+Para garantir a distribuição gratuita, rápida e independente de custos de servidores CDN caros, o Sentinela conta com uma esteira semanal automatizada no GitHub Actions (`.github/workflows/sync-radar-dataset.yml`):
+
+1. **Agendamento Semanal:** Todo domingo às 03:00 UTC (00:00 Horário de Brasília).
+2. **Compilação de Formatos:** O script `tools/export_radar_datasets.dart` compila e exporta a base em 3 formatos:
+   - **`sentinela_brasil.db`**: Banco SQLite com índice espacial nativo R\*Tree.
+   - **`sentinela_pois_brasil.json`**: Carga padronizada para sincronização direta in-app.
+   - **`sentinela_pois_brasil.csv`**: Formato tabular aberto para interoperabilidade e auditoria externa.
+   - **`SHA256SUMS.txt`**: Hashes de integridade criptográfica.
+3. **Publicação Automatizada:** Os artefatos são publicados no GitHub Releases sob a tag flutuante `data-latest`.
+
+---
+
+## 📦 Instalação Limpa (Clean Install) & Sincronização Inicial
+
+O aplicativo é instalado inicialmente com a **base limpa** (schema SQLite pré-criado, 0 POIs), reduzindo o footprint de download do instalador nas lojas e garantindo que o condutor sempre utilize a versão mais recente dos dados:
+
+1. **Aviso de Instalação Inicial:** Ao abrir o aplicativo, o Dashboard exibe um banner tonal Material 3 informando que a base de radares não está instalada.
+2. **Download sob Demanda:** Um simples toque no botão aciona o download da release mais recente diretamente do GitHub Releases (com fallback para raw e espelhos Overpass API).
+3. **Processamento e Swap Atômico:** Os dados são validados, deduplicados e gravados localmente em staging tables, executando a troca atômica sem downtime.
+4. **Ativação dos Alertas:** Com a base populada localmente, o aviso é automaticamente dispensado e todos os radares, semáforos, lombadas e pedágios passam a operar com alertas antecipados.
+
+---
+
+## ⏰ Notificação de Atualização Semanal (`DatasetUpdateChecker`)
+
+O motor de atualização avalia matematicamente a disponibilidade de novos dados com base no cronograma da esteira semanal:
+
+$$\text{Disponível} = \left( T_{\text{last\_update}} < T_{\text{latest\_release}} \right) \quad \text{onde} \quad T_{\text{latest\_release}} = \text{Domingo } 03\text{h}00\text{ UTC} + \Delta t_{\text{espera}} \; (1\text{ a } 2\text{ horas})$$
+
+- O alerta semanal permanece visível no Dashboard até que o condutor execute a atualização.
+- Após o swap atômico da base local, o alerta desaparece imediatamente.

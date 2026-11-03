@@ -302,6 +302,8 @@ void main() {
 
       final mirrorSyncService = PoiSyncService(
         db,
+        httpClient: mockClient,
+        directReleaseUrl: null,
         mirrorManager: mockMirror,
       );
 
