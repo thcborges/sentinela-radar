@@ -18,9 +18,33 @@ const String kOpenClawUfUrl =
     'https://servidor3.lucas.inf.br/openclaw/radar/api.pse?rota=/api/v1/status/estados/';
 
 final List<String> kMajorUfs = [
-  'SP', 'RJ', 'MG', 'PR', 'RS', 'SC', 'BA', 'PE', 'DF', 'GO', 'ES',
-  'CE', 'MT', 'MS', 'PA', 'PB', 'RN', 'AL', 'SE', 'PI', 'MA', 'TO',
-  'RO', 'AC', 'AP', 'RR', 'AM',
+  'SP',
+  'RJ',
+  'MG',
+  'PR',
+  'RS',
+  'SC',
+  'BA',
+  'PE',
+  'DF',
+  'GO',
+  'ES',
+  'CE',
+  'MT',
+  'MS',
+  'PA',
+  'PB',
+  'RN',
+  'AL',
+  'SE',
+  'PI',
+  'MA',
+  'TO',
+  'RO',
+  'AC',
+  'AP',
+  'RR',
+  'AM',
 ];
 
 Future<void> main(List<String> args) async {
@@ -47,7 +71,9 @@ Future<void> main(List<String> args) async {
   const exporter = DatasetExporter();
 
   if (cleanDb) {
-    stdout.writeln('Gerando base SQLite limpa (clean install): $cleanTarget...');
+    stdout.writeln(
+      'Gerando base SQLite limpa (clean install): $cleanTarget...',
+    );
     exporter.createCleanDatabase(targetPath: cleanTarget);
     stdout.writeln('Base limpa gerada com sucesso em: $cleanTarget');
   }
@@ -76,14 +102,18 @@ Future<void> main(List<String> args) async {
   final Map<String, int> sourceSummaries = {};
 
   final client = http.Client();
-  const requestHeaders = {'User-Agent': 'Mozilla/5.0 SentinelaRadarPipeline/1.0'};
+  const requestHeaders = {
+    'User-Agent': 'Mozilla/5.0 SentinelaRadarPipeline/1.0',
+  };
 
   // 1. ANTT Praças de Pedágio
   stdout.writeln('[Fonte 1/4] Coletando Praças de Pedágio ANTT...');
   List<dynamic> anttPedagiosRaw = [];
   if (!offlineOnly) {
     try {
-      final resp = await client.get(Uri.parse(kAnttPedagiosUrl), headers: requestHeaders).timeout(const Duration(seconds: 15));
+      final resp = await client
+          .get(Uri.parse(kAnttPedagiosUrl), headers: requestHeaders)
+          .timeout(const Duration(seconds: 15));
       if (resp.statusCode == 200) {
         final decoded = jsonDecode(resp.body);
         if (decoded is Map && decoded['praca-de-pedagio'] is List) {
@@ -93,21 +123,27 @@ Future<void> main(List<String> args) async {
         }
       }
     } catch (e) {
-      stdout.writeln('  Aviso: Falha ao baixar dados online de pedágios ANTT ($e).');
+      stdout.writeln(
+        '  Aviso: Falha ao baixar dados online de pedágios ANTT ($e).',
+      );
     }
   }
 
   final anttPedagiosPoints = builder.ingestAnttPedagios(rawDb, anttPedagiosRaw);
   allPois.addAll(anttPedagiosPoints);
   sourceSummaries['source_antt_pedagios'] = anttPedagiosPoints.length;
-  stdout.writeln('  -> ANTT Pedágios salvos na tabela source_antt_pedagios: ${anttPedagiosPoints.length} praças');
+  stdout.writeln(
+    '  -> ANTT Pedágios salvos na tabela source_antt_pedagios: ${anttPedagiosPoints.length} praças',
+  );
 
   // 2. ANTT Radares
   stdout.writeln('[Fonte 2/4] Coletando Radares de Velocidade ANTT...');
   List<dynamic> anttRadaresRaw = [];
   if (!offlineOnly) {
     try {
-      final resp = await client.get(Uri.parse(kAnttRadaresUrl), headers: requestHeaders).timeout(const Duration(seconds: 15));
+      final resp = await client
+          .get(Uri.parse(kAnttRadaresUrl), headers: requestHeaders)
+          .timeout(const Duration(seconds: 15));
       if (resp.statusCode == 200) {
         final decoded = jsonDecode(resp.body);
         if (decoded is Map && decoded['radar'] is List) {
@@ -117,42 +153,77 @@ Future<void> main(List<String> args) async {
         }
       }
     } catch (e) {
-      stdout.writeln('  Aviso: Falha ao baixar dados online de radares ANTT ($e).');
+      stdout.writeln(
+        '  Aviso: Falha ao baixar dados online de radares ANTT ($e).',
+      );
     }
   }
 
   final anttRadaresPoints = builder.ingestAnttRadares(rawDb, anttRadaresRaw);
   allPois.addAll(anttRadaresPoints);
   sourceSummaries['source_antt_radares'] = anttRadaresPoints.length;
-  stdout.writeln('  -> ANTT Radares salvos na tabela source_antt_radares: ${anttRadaresPoints.length} radares');
+  stdout.writeln(
+    '  -> ANTT Radares salvos na tabela source_antt_radares: ${anttRadaresPoints.length} radares',
+  );
 
   // 3. Cadastro Nacional Aberto (OpenClaw / DNIT / DERs / CETs)
-  stdout.writeln('[Fonte 3/4] Coletando Cadastro Nacional Aberto de Fiscalização...');
+  stdout.writeln(
+    '[Fonte 3/4] Coletando Cadastro Nacional Aberto de Fiscalização (Paginação Completa 27 UFs)...',
+  );
   List<dynamic> nacionalRaw = [];
   if (!offlineOnly) {
-    for (final uf in kMajorUfs.take(15)) {
-      try {
-        final url = '$kOpenClawUfUrl$uf&formato=json';
-        final resp = await client.get(Uri.parse(url), headers: requestHeaders).timeout(const Duration(seconds: 8));
-        if (resp.statusCode == 200) {
-          final decoded = jsonDecode(resp.body);
-          if (decoded is Map && decoded['resultado'] is Map) {
-            final res = decoded['resultado'] as Map;
-            if (res['pontos'] is List) {
-              nacionalRaw.addAll(res['pontos'] as List);
-            }
+    for (final uf in kMajorUfs) {
+      String? cursor;
+      int ufCount = 0;
+      while (true) {
+        try {
+          var url = '$kOpenClawUfUrl$uf&formato=json&limite=1000';
+          if (cursor != null && cursor.isNotEmpty) {
+            url += '&depois=$cursor';
           }
+          final resp = await client
+              .get(Uri.parse(url), headers: requestHeaders)
+              .timeout(const Duration(seconds: 15));
+          if (resp.statusCode == 200) {
+            final decoded = jsonDecode(resp.body);
+            if (decoded is Map && decoded['resultado'] is Map) {
+              final res = decoded['resultado'] as Map;
+              if (res['pontos'] is List) {
+                final list = res['pontos'] as List;
+                nacionalRaw.addAll(list);
+                ufCount += list.length;
+              }
+              final nextCursor = res['proximo_depois']?.toString();
+              if (nextCursor != null &&
+                  nextCursor.isNotEmpty &&
+                  nextCursor != cursor) {
+                cursor = nextCursor;
+              } else {
+                break;
+              }
+            } else {
+              break;
+            }
+          } else {
+            break;
+          }
+        } catch (e) {
+          stdout.writeln(
+            '  Aviso: Falha pontual na UF $uf (cursor: $cursor): $e',
+          );
+          break;
         }
-      } catch (_) {
-        // Tolerância a indisponibilidade pontual de UF
       }
+      stdout.writeln('  -> UF $uf: $ufCount pontos coletados');
     }
   }
 
   final nacionalPoints = builder.ingestCadastroNacional(rawDb, nacionalRaw);
   allPois.addAll(nacionalPoints);
   sourceSummaries['source_nacional_aberto'] = nacionalPoints.length;
-  stdout.writeln('  -> Cadastro Nacional salvo na tabela source_nacional_aberto: ${nacionalPoints.length} pontos');
+  stdout.writeln(
+    '  -> Cadastro Nacional salvo na tabela source_nacional_aberto: ${nacionalPoints.length} pontos',
+  );
 
   // 4. OpenStreetMap Comunitário (Fallback para snapshot/cache local)
   stdout.writeln('[Fonte 4/4] Carregando base OpenStreetMap comunitária...');
@@ -170,19 +241,30 @@ Future<void> main(List<String> args) async {
   final ingestedOsm = builder.ingestOsmComunitario(rawDb, osmPoints);
   allPois.addAll(ingestedOsm);
   sourceSummaries['source_osm_comunitario'] = ingestedOsm.length;
-  stdout.writeln('  -> OpenStreetMap salvo na tabela source_osm_comunitario: ${ingestedOsm.length} elementos');
+  stdout.writeln(
+    '  -> OpenStreetMap salvo na tabela source_osm_comunitario: ${ingestedOsm.length} elementos',
+  );
 
   client.close();
 
   stdout.writeln('Total bruto de pontos agregados: ${allPois.length}');
 
   // 5. Deduplicação Espacial Inteligente (<35m)
-  stdout.writeln('Executando deduplicação espacial de alta fidelidade (<35 metros)...');
-  final consolidatedPois = builder.deduplicatePois(allPois, distanceThresholdMeters: 35.0);
-  stdout.writeln('Total de pontos consolidados e deduplicados: ${consolidatedPois.length}');
+  stdout.writeln(
+    'Executando deduplicação espacial de alta fidelidade (<35 metros)...',
+  );
+  final consolidatedPois = builder.deduplicatePois(
+    allPois,
+    distanceThresholdMeters: 35.0,
+  );
+  stdout.writeln(
+    'Total de pontos consolidados e deduplicados: ${consolidatedPois.length}',
+  );
 
   // 6. Salvando tabela consolidada e R*Tree index no SQLite
-  stdout.writeln('Consolidando tabela `pois` e índice espacial R*Tree `pois_index`...');
+  stdout.writeln(
+    'Consolidando tabela `pois` e índice espacial R*Tree `pois_index`...',
+  );
   builder.saveConsolidatedPois(
     rawDb,
     consolidatedPois,
@@ -202,11 +284,7 @@ Future<void> main(List<String> args) async {
 
   // 8. Calculando SHA-256
   stdout.writeln('Calculando checksums SHA-256 dos artefatos...');
-  final filesToHash = [
-    File(dbPath),
-    File(jsonPath),
-    File(csvPath),
-  ];
+  final filesToHash = [File(dbPath), File(jsonPath), File(csvPath)];
 
   final shaBuffer = StringBuffer();
   for (final file in filesToHash) {
