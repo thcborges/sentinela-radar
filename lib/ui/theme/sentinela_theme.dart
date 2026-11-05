@@ -62,6 +62,7 @@ class SentinelaTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      splashFactory: InkRipple.splashFactory,
       scaffoldBackgroundColor: surfaceDark,
       colorScheme: colorScheme,
       cardTheme: CardThemeData(
