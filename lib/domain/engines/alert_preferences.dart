@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../l10n/app_language.dart';
+import '../models/poi_model.dart';
 import 'package:sentinela/core/platform/haptic_feedback_engine.dart';
 
 /// Preferências e tolerâncias customizáveis para parametrização do motor de alertas do Sentinela.
@@ -14,6 +15,7 @@ class AlertPreferences extends Equatable {
   final HapticIntensity hapticIntensity;
   final AppLanguage language;
   final bool highContrastMode;
+  final Set<PoiType> enabledPoiTypes;
 
   const AlertPreferences({
     this.speedTolerancePercent = 0.0,
@@ -26,7 +28,32 @@ class AlertPreferences extends Equatable {
     this.hapticIntensity = HapticIntensity.medium,
     this.language = AppLanguage.pt,
     this.highContrastMode = false,
+    this.enabledPoiTypes = const {
+      PoiType.fixedRadar,
+      PoiType.mobileRadar,
+      PoiType.trafficLightRadar,
+      PoiType.redLightCamera,
+      PoiType.electronicSpeedBump,
+      PoiType.physicalSpeedBump,
+      PoiType.tollBooth,
+      PoiType.freeFlowToll,
+      PoiType.highwayPatrol,
+    },
   });
+
+  /// Verifica se uma determinada categoria de POI está ativa para visualização e alertas.
+  bool isPoiTypeEnabled(PoiType type) => enabledPoiTypes.contains(type);
+
+  /// Cria uma nova instância ativando ou desativando uma categoria específica de POI.
+  AlertPreferences togglePoiType(PoiType type, bool enabled) {
+    final updated = Set<PoiType>.from(enabledPoiTypes);
+    if (enabled) {
+      updated.add(type);
+    } else {
+      updated.remove(type);
+    }
+    return copyWith(enabledPoiTypes: updated);
+  }
 
   /// Determina se [currentSpeedKmh] excede o [speedLimit] considerando tolerâncias absolutas e percentuais.
   bool isOverSpeed(double currentSpeedKmh, int? speedLimit) {
@@ -48,6 +75,7 @@ class AlertPreferences extends Equatable {
     HapticIntensity? hapticIntensity,
     AppLanguage? language,
     bool? highContrastMode,
+    Set<PoiType>? enabledPoiTypes,
   }) {
     return AlertPreferences(
       speedTolerancePercent:
@@ -62,6 +90,7 @@ class AlertPreferences extends Equatable {
       hapticIntensity: hapticIntensity ?? this.hapticIntensity,
       language: language ?? this.language,
       highContrastMode: highContrastMode ?? this.highContrastMode,
+      enabledPoiTypes: enabledPoiTypes ?? this.enabledPoiTypes,
     );
   }
 
@@ -77,6 +106,7 @@ class AlertPreferences extends Equatable {
       'hapticIntensity': hapticIntensity.name,
       'language': language.name,
       'highContrastMode': highContrastMode,
+      'enabledPoiTypes': enabledPoiTypes.map((t) => t.name).toList(),
     };
   }
 
@@ -97,6 +127,24 @@ class AlertPreferences extends Equatable {
       return AppLanguage.pt;
     }
 
+    Set<PoiType> parsePoiTypes(dynamic val) {
+      if (val is List) {
+        final parsed = <PoiType>{};
+        for (final item in val) {
+          if (item is String) {
+            for (final type in PoiType.values) {
+              if (type.name == item) {
+                parsed.add(type);
+                break;
+              }
+            }
+          }
+        }
+        if (parsed.isNotEmpty) return parsed;
+      }
+      return PoiType.values.toSet();
+    }
+
     return AlertPreferences(
       speedTolerancePercent:
           (json['speedTolerancePercent'] as num?)?.toDouble() ?? 0.0,
@@ -111,6 +159,7 @@ class AlertPreferences extends Equatable {
       hapticIntensity: parseHaptic(json['hapticIntensity']),
       language: parseLang(json['language']),
       highContrastMode: json['highContrastMode'] as bool? ?? false,
+      enabledPoiTypes: parsePoiTypes(json['enabledPoiTypes']),
     );
   }
 
@@ -126,5 +175,6 @@ class AlertPreferences extends Equatable {
         hapticIntensity,
         language,
         highContrastMode,
+        enabledPoiTypes,
       ];
 }

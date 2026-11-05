@@ -45,9 +45,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   SyncProgress? _currentProgress;
   late Map<String, int> _stats;
 
-  // Filtros locais
-  bool _filterRadars = true;
-  bool _filterTrafficLights = true;
+  // Filtros locais de POIs
+  bool _filterFixedRadar = true;
+  bool _filterMobileRadar = true;
+  bool _filterTrafficLightRadar = true;
+  bool _filterRedLightCamera = true;
   bool _filterSpeedBumps = true;
   bool _filterTolls = true;
   bool _filterPatrol = true;
@@ -91,6 +93,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _selectedLanguage = _preferences.language;
     _highContrastMode = _preferences.highContrastMode;
 
+    final enabled = widget.dashboardCubit?.state.enabledPoiTypes ?? _preferences.enabledPoiTypes;
+    _filterFixedRadar = enabled.contains(PoiType.fixedRadar);
+    _filterMobileRadar = enabled.contains(PoiType.mobileRadar);
+    _filterTrafficLightRadar = enabled.contains(PoiType.trafficLightRadar);
+    _filterRedLightCamera = enabled.contains(PoiType.redLightCamera);
+    _filterSpeedBumps = enabled.contains(PoiType.physicalSpeedBump) || enabled.contains(PoiType.electronicSpeedBump);
+    _filterTolls = enabled.contains(PoiType.tollBooth) || enabled.contains(PoiType.freeFlowToll);
+    _filterPatrol = enabled.contains(PoiType.highwayPatrol);
+
     try {
       final cubitState = widget.dashboardCubit?.state;
       if (cubitState != null) {
@@ -124,6 +135,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _updatePreferences() {
+    final enabledTypes = <PoiType>{};
+    if (_filterFixedRadar) enabledTypes.add(PoiType.fixedRadar);
+    if (_filterMobileRadar) enabledTypes.add(PoiType.mobileRadar);
+    if (_filterTrafficLightRadar) enabledTypes.add(PoiType.trafficLightRadar);
+    if (_filterRedLightCamera) enabledTypes.add(PoiType.redLightCamera);
+    if (_filterSpeedBumps) {
+      enabledTypes.add(PoiType.physicalSpeedBump);
+      enabledTypes.add(PoiType.electronicSpeedBump);
+    }
+    if (_filterTolls) {
+      enabledTypes.add(PoiType.tollBooth);
+      enabledTypes.add(PoiType.freeFlowToll);
+    }
+    if (_filterPatrol) enabledTypes.add(PoiType.highwayPatrol);
+
     final newPrefs = _preferences.copyWith(
       speedToleranceKmh: _speedToleranceKmh,
       alertOnlyIfOverSpeed: _alertOnlyIfOverSpeed,
@@ -134,15 +160,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       hapticIntensity: _hapticIntensity,
       language: _selectedLanguage,
       highContrastMode: _highContrastMode,
+      enabledPoiTypes: enabledTypes,
     );
     _preferences = newPrefs;
-    widget.dashboardCubit?.alertMachine.updatePreferences(newPrefs);
-    widget.dashboardCubit?.setHapticFeedback(
-      enabled: _hapticEnabled,
-      intensity: _hapticIntensity,
-    );
-    widget.dashboardCubit?.setLanguage(_selectedLanguage);
-    widget.dashboardCubit?.setHighContrastMode(_highContrastMode);
+    try {
+      widget.dashboardCubit?.alertMachine.updatePreferences(newPrefs);
+    } catch (_) {}
+    try {
+      widget.dashboardCubit?.setHapticFeedback(
+        enabled: _hapticEnabled,
+        intensity: _hapticIntensity,
+      );
+      widget.dashboardCubit?.setLanguage(_selectedLanguage);
+      widget.dashboardCubit?.setHighContrastMode(_highContrastMode);
+    } catch (_) {}
   }
 
   Future<void> _exportBackup() async {
@@ -320,28 +351,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(
               children: [
                 SwitchListTile(
-                  title: const Text('Radares de Velocidade'),
-                  subtitle: const Text('Fixos e móveis'),
-                  value: _filterRadars,
+                  key: const Key('filter_switch_fixed_radar'),
+                  title: const Text('Radar Fixo'),
+                  subtitle: const Text('Medidores fixos de velocidade'),
+                  value: _filterFixedRadar,
                   onChanged: (val) {
-                    setState(() => _filterRadars = val);
+                    setState(() => _filterFixedRadar = val);
                     widget.dashboardCubit?.togglePoiType(PoiType.fixedRadar, val);
-                    widget.dashboardCubit?.togglePoiType(PoiType.mobileRadar, val);
+                    _updatePreferences();
                   },
                 ),
                 const Divider(height: 1, color: Color(0xFF262626)),
                 SwitchListTile(
-                  title: const Text('Semáforos e Câmeras'),
-                  subtitle: const Text('Avanço de sinal vermelho e parada sobre faixa'),
-                  value: _filterTrafficLights,
+                  key: const Key('filter_switch_mobile_radar'),
+                  title: const Text('Radar Móvel'),
+                  subtitle: const Text('Pontos frequentes de radar móvel ou estático'),
+                  value: _filterMobileRadar,
                   onChanged: (val) {
-                    setState(() => _filterTrafficLights = val);
-                    widget.dashboardCubit?.togglePoiType(PoiType.trafficLightRadar, val);
-                    widget.dashboardCubit?.togglePoiType(PoiType.redLightCamera, val);
+                    setState(() => _filterMobileRadar = val);
+                    widget.dashboardCubit?.togglePoiType(PoiType.mobileRadar, val);
+                    _updatePreferences();
                   },
                 ),
                 const Divider(height: 1, color: Color(0xFF262626)),
                 SwitchListTile(
+                  key: const Key('filter_switch_traffic_light_radar'),
+                  title: const Text('Semáforo com Radar'),
+                  subtitle: const Text('Velocidade e avanço de sinal vermelho'),
+                  value: _filterTrafficLightRadar,
+                  onChanged: (val) {
+                    setState(() => _filterTrafficLightRadar = val);
+                    widget.dashboardCubit?.togglePoiType(PoiType.trafficLightRadar, val);
+                    _updatePreferences();
+                  },
+                ),
+                const Divider(height: 1, color: Color(0xFF262626)),
+                SwitchListTile(
+                  key: const Key('filter_switch_red_light_camera'),
+                  title: const Text('Câmera de Semáforo (Vermelho)'),
+                  subtitle: const Text('Exclusivo avanço de sinal e parada sobre faixa'),
+                  value: _filterRedLightCamera,
+                  onChanged: (val) {
+                    setState(() => _filterRedLightCamera = val);
+                    widget.dashboardCubit?.togglePoiType(PoiType.redLightCamera, val);
+                    _updatePreferences();
+                  },
+                ),
+                const Divider(height: 1, color: Color(0xFF262626)),
+                SwitchListTile(
+                  key: const Key('filter_switch_speed_bumps'),
                   title: const Text('Lombadas e Quebra-Molas'),
                   subtitle: const Text('Redutores físicos e eletrônicos'),
                   value: _filterSpeedBumps,
@@ -349,10 +407,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     setState(() => _filterSpeedBumps = val);
                     widget.dashboardCubit?.togglePoiType(PoiType.physicalSpeedBump, val);
                     widget.dashboardCubit?.togglePoiType(PoiType.electronicSpeedBump, val);
+                    _updatePreferences();
                   },
                 ),
                 const Divider(height: 1, color: Color(0xFF262626)),
                 SwitchListTile(
+                  key: const Key('filter_switch_tolls'),
                   title: const Text('Praças de Pedágio'),
                   subtitle: const Text('Convencionais e pórticos Free Flow'),
                   value: _filterTolls,
@@ -360,16 +420,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     setState(() => _filterTolls = val);
                     widget.dashboardCubit?.togglePoiType(PoiType.tollBooth, val);
                     widget.dashboardCubit?.togglePoiType(PoiType.freeFlowToll, val);
+                    _updatePreferences();
                   },
                 ),
                 const Divider(height: 1, color: Color(0xFF262626)),
                 SwitchListTile(
+                  key: const Key('filter_switch_patrol'),
                   title: const Text('Polícia Rodoviária'),
                   subtitle: const Text('Postos fixos da PRF e Estadual'),
                   value: _filterPatrol,
                   onChanged: (val) {
                     setState(() => _filterPatrol = val);
                     widget.dashboardCubit?.togglePoiType(PoiType.highwayPatrol, val);
+                    _updatePreferences();
                   },
                 ),
               ],
