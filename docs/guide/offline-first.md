@@ -98,4 +98,17 @@ O motor de atualização avalia matematicamente a disponibilidade de novos dados
 $$\text{Disponível} = \left( T_{\text{last\_update}} < T_{\text{latest\_release}} \right) \quad \text{onde} \quad T_{\text{latest\_release}} = \text{Domingo } 03\text{h}00\text{ UTC} + \Delta t_{\text{espera}} \; (1\text{ a } 2\text{ horas})$$
 
 - O alerta semanal permanece visível no Dashboard até que o condutor execute a atualização.
+
+---
+
+## 🌐 Pipeline de Ingestão Multi-Fonte & Banco SQLite Transparent
+
+Para maximizar a cobertura de pontos de fiscalização e tráfego em todo o território nacional, o pipeline externo (`tools/fetch_and_build_radar_database.dart`) unifica múltiplas fontes abertas oficiais e comunitárias:
+
+1. **ANTT Praças de Pedágio:** Concessões federais com tarifas, pistas convencionais e pórticos Free Flow gravadas na tabela `source_antt_pedagios`.
+2. **ANTT Radares:** Fiscalização eletrônica oficial de velocidade em rodovias federais sob concessão na tabela `source_antt_radares`.
+3. **Cadastro Nacional Aberto (DNIT / DERs / CETs):** Base unificada dos 27 estados da federação cobrindo radares fixos, móveis e semafóricos na tabela `source_nacional_aberto`.
+4. **OpenStreetMap Comunitário:** Lombadas físicas/eletrônicas, câmeras de avanço e postos da Polícia Rodoviária Federal na tabela `source_osm_comunitario`.
+5. **Deduplicação Espacial Inteligente (<35m):** Fusão de pontos coincidentes preservando os dados mais completos (limites de velocidade regulamentados, rumo e concessionárias) na tabela `pois` indexada no `pois_index` (R*Tree).
+6. **Seleção Granular pelo Condutor:** Nas configurações do Sentinela, o motorista escolhe individualmente quais tipos de POIs deseja visualizar e ser alertado (Radar Fixo, Radar Móvel, Semáforo com Radar, Câmera de Sinal Vermelho, Pedágios, Lombadas e Polícia Rodoviária).
 - Após o swap atômico da base local, o alerta desaparece imediatamente.

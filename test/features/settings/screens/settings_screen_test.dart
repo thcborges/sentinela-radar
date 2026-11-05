@@ -123,6 +123,13 @@ void main() {
     });
 
     testWidgets('deve alterar switches de filtros e notificar DashboardCubit', (tester) async {
+      tester.view.physicalSize = const Size(1200, 3200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
       final mockDashboardCubit = MockDashboardCubit();
       when(() => mockDashboardCubit.state).thenReturn(const DashboardState());
       when(() => mockSyncService.startInAppUpdate()).thenAnswer((_) async => true);
@@ -137,14 +144,23 @@ void main() {
         ),
       );
 
-      final radarSwitch = find.widgetWithText(SwitchListTile, 'Radares de Velocidade');
-      expect(radarSwitch, findsOneWidget);
-      await tester.tap(radarSwitch);
+      final fixedRadarSwitch = find.widgetWithText(SwitchListTile, 'Radar Fixo');
+      expect(fixedRadarSwitch, findsOneWidget);
+      await tester.tap(fixedRadarSwitch);
       await tester.pump();
 
-      await tester.scrollUntilVisible(find.widgetWithText(SwitchListTile, 'Semáforos e Câmeras'), 200);
-      final tlSwitch = find.widgetWithText(SwitchListTile, 'Semáforos e Câmeras');
-      await tester.tap(tlSwitch);
+      final mobileRadarSwitch = find.widgetWithText(SwitchListTile, 'Radar Móvel');
+      await tester.tap(mobileRadarSwitch);
+      await tester.pump();
+
+      await tester.scrollUntilVisible(find.widgetWithText(SwitchListTile, 'Semáforo com Radar'), 200);
+      final tlRadarSwitch = find.widgetWithText(SwitchListTile, 'Semáforo com Radar');
+      await tester.tap(tlRadarSwitch);
+      await tester.pump();
+
+      await tester.scrollUntilVisible(find.widgetWithText(SwitchListTile, 'Câmera de Semáforo (Vermelho)'), 200);
+      final redLightSwitch = find.widgetWithText(SwitchListTile, 'Câmera de Semáforo (Vermelho)');
+      await tester.tap(redLightSwitch);
       await tester.pump();
 
       await tester.scrollUntilVisible(find.widgetWithText(SwitchListTile, 'Lombadas e Quebra-Molas'), 200);
