@@ -17,13 +17,14 @@ jobs:
       - name: Checkout do Repositório
         uses: actions/checkout@v4
 
-      - name: Setup Dart SDK
-        uses: dart-lang/setup-dart@v1
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
         with:
-          sdk: stable
+          channel: stable
+          cache: true
 
       - name: Instalar Dependências
-        run: dart pub get
+        run: flutter pub get
 
       - name: Compilar Banco SQLite R*Tree, JSON e CSV
         run: |
