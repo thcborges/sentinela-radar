@@ -30,6 +30,8 @@ void main() {
       final tables = db.select("SELECT name FROM sqlite_master WHERE type='table';").map((r) => r['name'] as String).toSet();
       expect(tables.contains('source_antt_pedagios'), isTrue);
       expect(tables.contains('source_antt_radares'), isTrue);
+      expect(tables.contains('source_prf_radares'), isTrue);
+      expect(tables.contains('source_dnit_pncv'), isTrue);
       expect(tables.contains('source_nacional_aberto'), isTrue);
       expect(tables.contains('source_osm_comunitario'), isTrue);
       expect(tables.contains('source_summary'), isTrue);
@@ -112,6 +114,111 @@ void main() {
 
       final rows = db.select('SELECT COUNT(*) AS count FROM source_antt_radares;');
       expect(rows.first['count'], equals(1));
+
+      db.close();
+    });
+
+    test('deve inserir dados da PRF na tabela source_prf_radares e mapear para POIs', () {
+      final builder = MultiSourceRadarBuilder();
+      final db = sqlite3.open(dbPath);
+      builder.initializeMultiSourceSchema(db);
+
+      final samplePrf = [
+        {
+          'IDENTIFICADOR': 'PRF-001',
+          'CONCESSIONÁRIA': 'NOVADUTRA',
+          'BR': '116',
+          'UF': 'RJ',
+          'LOCAL': '165.5',
+          'MUNICÍPIO': 'São João de Meriti',
+          'SENTIDO': 'Crescente',
+          'FAIXAS': '3',
+          'TIPO EQUIPAMENTO': 'CONTROLADOR',
+          'LATITUDE': -22.8021,
+          'LONGITUDE': -43.3712,
+          'VELOCIDADE LEVE': '80',
+          'VELOCIDADE PESADO': '80',
+          'ESTADO': 'ATIVO',
+        },
+        {
+          'IDENTIFICADOR': 'PRF-002',
+          'CONCESSIONÁRIA': '',
+          'BR': 'BR-101',
+          'UF': 'SC',
+          'LOCAL': '200',
+          'MUNICÍPIO': 'São José',
+          'SENTIDO': 'Decrescente',
+          'FAIXAS': '2',
+          'TIPO EQUIPAMENTO': 'REDUTOR',
+          'LATITUDE': -27.6012,
+          'LONGITUDE': -48.6234,
+          'VELOCIDADE LEVE': '60',
+          'VELOCIDADE PESADO': '60',
+          'ESTADO': 'ATIVO',
+        }
+      ];
+
+      final pois = builder.ingestPrfRadares(db, samplePrf);
+      expect(pois.length, equals(2));
+      expect(pois[0].type, equals(PoiType.fixedRadar));
+      expect(pois[0].speedLimit, equals(80));
+      expect(pois[0].roadName, equals('BR-116'));
+      expect(pois[1].type, equals(PoiType.electronicSpeedBump));
+      expect(pois[1].speedLimit, equals(60));
+
+      final rows = db.select('SELECT COUNT(*) AS count FROM source_prf_radares;');
+      expect(rows.first['count'], equals(2));
+
+      db.close();
+    });
+
+    test('deve inserir dados do DNIT PNCV na tabela source_dnit_pncv e mapear para POIs', () {
+      final builder = MultiSourceRadarBuilder();
+      final db = sqlite3.open(dbPath);
+      builder.initializeMultiSourceSchema(db);
+
+      final sampleDnit = [
+        {
+          'codigo': 'DNIT-5421',
+          'uf': 'MG',
+          'rodovia': 'BR-381',
+          'km': '480.2',
+          'municipio': 'Betim',
+          'faixas': '2',
+          'tipo': 'RAD',
+          'marca_modelo': 'Fotosensores',
+          'latitude': -19.9823,
+          'longitude': -44.2012,
+          'velocidade': '80',
+          'situacao': 'Ativo',
+        },
+        {
+          'codigo': 'DNIT-5422',
+          'uf': 'RS',
+          'rodovia': 'BR-290',
+          'km': '112.0',
+          'municipio': 'Eldorado do Sul',
+          'faixas': '1',
+          'tipo': 'REV',
+          'marca_modelo': 'Perkons',
+          'latitude': -30.0123,
+          'longitude': -51.3412,
+          'velocidade': '50',
+          'situacao': 'Ativo',
+        }
+      ];
+
+      final pois = builder.ingestDnitPncv(db, sampleDnit);
+      expect(pois.length, equals(2));
+      expect(pois[0].type, equals(PoiType.fixedRadar));
+      expect(pois[0].speedLimit, equals(80));
+      expect(pois[0].state, equals('MG'));
+      expect(pois[1].type, equals(PoiType.electronicSpeedBump));
+      expect(pois[1].speedLimit, equals(50));
+      expect(pois[1].state, equals('RS'));
+
+      final rows = db.select('SELECT COUNT(*) AS count FROM source_dnit_pncv;');
+      expect(rows.first['count'], equals(2));
 
       db.close();
     });
