@@ -132,14 +132,21 @@ class MultiSourceRadarBuilder {
         if (raw is! Map) continue;
         final map = raw as Map<String, dynamic>;
 
-        final latStr = (map['latitude']?.toString() ?? '').replaceAll(',', '.').trim();
-        final lonStr = (map['longitude']?.toString() ?? '').replaceAll(',', '.').trim();
+        final latStr = (map['latitude']?.toString() ?? '')
+            .replaceAll(',', '.')
+            .trim();
+        final lonStr = (map['longitude']?.toString() ?? '')
+            .replaceAll(',', '.')
+            .trim();
         final lat = double.tryParse(latStr);
         final lon = double.tryParse(lonStr);
         if (lat == null || lon == null || lat == 0.0 || lon == 0.0) continue;
 
         final concessionaria = map['concessionaria']?.toString() ?? '';
-        final praca = map['praca_de_pedagio']?.toString() ?? map['praca']?.toString() ?? 'Praça de Pedágio';
+        final praca =
+            map['praca_de_pedagio']?.toString() ??
+            map['praca']?.toString() ??
+            'Praça de Pedágio';
         final rodovia = map['rodovia']?.toString() ?? '';
         final uf = map['uf']?.toString() ?? '';
         final km = map['km_m']?.toString() ?? '';
@@ -148,9 +155,11 @@ class MultiSourceRadarBuilder {
         final sentido = map['sentido']?.toString() ?? '';
         final situacao = map['situacao']?.toString() ?? 'Ativo';
 
-        final tarifaAutoStr = (map['tarifa_automovel']?.toString() ?? '').replaceAll(',', '.');
+        final tarifaAutoStr = (map['tarifa_automovel']?.toString() ?? '')
+            .replaceAll(',', '.');
         final tarifaAuto = double.tryParse(tarifaAutoStr);
-        final tarifaComStr = (map['tarifa_comercial']?.toString() ?? '').replaceAll(',', '.');
+        final tarifaComStr = (map['tarifa_comercial']?.toString() ?? '')
+            .replaceAll(',', '.');
         final tarifaCom = double.tryParse(tarifaComStr);
 
         stmt.execute([
@@ -170,7 +179,8 @@ class MultiSourceRadarBuilder {
           now,
         ]);
 
-        final isFreeFlow = praca.toLowerCase().contains('free flow') ||
+        final isFreeFlow =
+            praca.toLowerCase().contains('free flow') ||
             praca.toLowerCase().contains('portico') ||
             tipoPista.toLowerCase().contains('free flow');
 
@@ -179,19 +189,21 @@ class MultiSourceRadarBuilder {
             : praca;
 
         sequenceId++;
-        points.add(PoiPoint(
-          id: sequenceId,
-          type: isFreeFlow ? PoiType.freeFlowToll : PoiType.tollBooth,
-          latitude: lat,
-          longitude: lon,
-          speedLimit: isFreeFlow ? 100 : 40,
-          roadName: roadDisplay,
-          tollFeeCar: tarifaAuto,
-          operator: concessionaria,
-          city: municipio,
-          state: uf,
-          source: 'ANTT - Concessões Federais',
-        ));
+        points.add(
+          PoiPoint(
+            id: sequenceId,
+            type: isFreeFlow ? PoiType.freeFlowToll : PoiType.tollBooth,
+            latitude: lat,
+            longitude: lon,
+            speedLimit: isFreeFlow ? 100 : 40,
+            roadName: roadDisplay,
+            tollFeeCar: tarifaAuto,
+            operator: concessionaria,
+            city: municipio,
+            state: uf,
+            source: 'ANTT - Concessões Federais',
+          ),
+        );
       }
       db.execute('COMMIT;');
     } catch (_) {
@@ -226,8 +238,12 @@ class MultiSourceRadarBuilder {
         if (raw is! Map) continue;
         final map = raw as Map<String, dynamic>;
 
-        final latStr = (map['latitude']?.toString() ?? '').replaceAll(',', '.').trim();
-        final lonStr = (map['longitude']?.toString() ?? '').replaceAll(',', '.').trim();
+        final latStr = (map['latitude']?.toString() ?? '')
+            .replaceAll(',', '.')
+            .trim();
+        final lonStr = (map['longitude']?.toString() ?? '')
+            .replaceAll(',', '.')
+            .trim();
         final lat = double.tryParse(latStr);
         final lon = double.tryParse(lonStr);
         if (lat == null || lon == null || lat == 0.0 || lon == 0.0) continue;
@@ -243,10 +259,14 @@ class MultiSourceRadarBuilder {
         final situacao = map['situacao']?.toString() ?? 'Ativo';
 
         final velLeveStr = map['velocidade_leve']?.toString() ?? '';
-        final velLeve = int.tryParse(velLeveStr.replaceAll(RegExp(r'[^0-9]'), ''));
+        final velLeve = int.tryParse(
+          velLeveStr.replaceAll(RegExp(r'[^0-9]'), ''),
+        );
 
         final velPesadoStr = map['velocidade_pesado']?.toString() ?? '';
-        final velPesado = int.tryParse(velPesadoStr.replaceAll(RegExp(r'[^0-9]'), ''));
+        final velPesado = int.tryParse(
+          velPesadoStr.replaceAll(RegExp(r'[^0-9]'), ''),
+        );
 
         stmt.execute([
           concessionaria,
@@ -265,12 +285,15 @@ class MultiSourceRadarBuilder {
           now,
         ]);
 
-        final isSemaforo = tipoRadar.toLowerCase().contains('semaforo') ||
+        final isSemaforo =
+            tipoRadar.toLowerCase().contains('semaforo') ||
             tipoRadar.toLowerCase().contains('semáforo') ||
             tipoRadar.toLowerCase().contains('vermelho');
 
         final poiType = isSemaforo
-            ? (velLeve != null ? PoiType.trafficLightRadar : PoiType.redLightCamera)
+            ? (velLeve != null
+                  ? PoiType.trafficLightRadar
+                  : PoiType.redLightCamera)
             : PoiType.fixedRadar;
 
         final roadDisplay = rodovia.isNotEmpty
@@ -278,18 +301,20 @@ class MultiSourceRadarBuilder {
             : 'Rodovia Federal';
 
         sequenceId++;
-        points.add(PoiPoint(
-          id: sequenceId,
-          type: poiType,
-          latitude: lat,
-          longitude: lon,
-          speedLimit: velLeve,
-          roadName: roadDisplay,
-          operator: concessionaria,
-          city: municipio,
-          state: uf,
-          source: 'ANTT - Fiscalização Eletrônica',
-        ));
+        points.add(
+          PoiPoint(
+            id: sequenceId,
+            type: poiType,
+            latitude: lat,
+            longitude: lon,
+            speedLimit: velLeve,
+            roadName: roadDisplay,
+            operator: concessionaria,
+            city: municipio,
+            state: uf,
+            source: 'ANTT - Fiscalização Eletrônica',
+          ),
+        );
       }
       db.execute('COMMIT;');
     } catch (_) {
@@ -324,20 +349,32 @@ class MultiSourceRadarBuilder {
         if (raw is! Map) continue;
         final map = raw as Map<String, dynamic>;
 
-        final latStr = (map['latitude']?.toString() ?? '').replaceAll(',', '.').trim();
-        final lonStr = (map['longitude']?.toString() ?? '').replaceAll(',', '.').trim();
+        final latStr = (map['latitude']?.toString() ?? '')
+            .replaceAll(',', '.')
+            .trim();
+        final lonStr = (map['longitude']?.toString() ?? '')
+            .replaceAll(',', '.')
+            .trim();
         final lat = double.tryParse(latStr);
         final lon = double.tryParse(lonStr);
         if (lat == null || lon == null || lat == 0.0 || lon == 0.0) continue;
 
         final codigo = map['id']?.toString() ?? map['codigo']?.toString() ?? '';
-        final tipo = map['tipo_radar']?.toString() ?? map['tipo']?.toString() ?? map['modalidade']?.toString() ?? 'Radar';
+        final tipo =
+            map['tipo_radar']?.toString() ??
+            map['tipo']?.toString() ??
+            map['modalidade']?.toString() ??
+            'Radar';
         final uf = map['uf']?.toString() ?? '';
         final municipio = map['municipio']?.toString() ?? '';
-        final rodovia = map['via']?.toString() ?? map['rodovia']?.toString() ?? '';
+        final rodovia =
+            map['via']?.toString() ?? map['rodovia']?.toString() ?? '';
         final situacao = map['situacao']?.toString() ?? 'ativo';
 
-        final velStr = map['velocidade']?.toString() ?? map['velocidade_regulamentada']?.toString() ?? '';
+        final velStr =
+            map['velocidade']?.toString() ??
+            map['velocidade_regulamentada']?.toString() ??
+            '';
         final vel = int.tryParse(velStr.replaceAll(RegExp(r'[^0-9]'), ''));
 
         final sentido = map['sentido']?.toString() ?? '';
@@ -360,32 +397,43 @@ class MultiSourceRadarBuilder {
 
         final lowerTipo = tipo.toLowerCase();
         final PoiType poiType;
-        if (lowerTipo.contains('semaforo') || lowerTipo.contains('semáforo') || lowerTipo.contains('vermelho')) {
-          poiType = (vel != null && vel > 0) ? PoiType.trafficLightRadar : PoiType.redLightCamera;
-        } else if (lowerTipo.contains('movel') || lowerTipo.contains('móvel') || lowerTipo.contains('portatil')) {
+        if (lowerTipo.contains('semaforo') ||
+            lowerTipo.contains('semáforo') ||
+            lowerTipo.contains('vermelho')) {
+          poiType = (vel != null && vel > 0)
+              ? PoiType.trafficLightRadar
+              : PoiType.redLightCamera;
+        } else if (lowerTipo.contains('movel') ||
+            lowerTipo.contains('móvel') ||
+            lowerTipo.contains('portatil')) {
           poiType = PoiType.mobileRadar;
-        } else if (lowerTipo.contains('lombada') || lowerTipo.contains('eletronica')) {
+        } else if (lowerTipo.contains('lombada') ||
+            lowerTipo.contains('eletronica')) {
           poiType = PoiType.electronicSpeedBump;
-        } else if (lowerTipo.contains('pedagio') || lowerTipo.contains('pedágio')) {
+        } else if (lowerTipo.contains('pedagio') ||
+            lowerTipo.contains('pedágio')) {
           poiType = PoiType.tollBooth;
-        } else if (lowerTipo.contains('policia') || lowerTipo.contains('polícia')) {
+        } else if (lowerTipo.contains('policia') ||
+            lowerTipo.contains('polícia')) {
           poiType = PoiType.highwayPatrol;
         } else {
           poiType = PoiType.fixedRadar;
         }
 
         sequenceId++;
-        points.add(PoiPoint(
-          id: sequenceId,
-          type: poiType,
-          latitude: lat,
-          longitude: lon,
-          speedLimit: vel,
-          roadName: rodovia.isNotEmpty ? rodovia : 'Via Pública',
-          city: municipio,
-          state: uf,
-          source: fonteNome,
-        ));
+        points.add(
+          PoiPoint(
+            id: sequenceId,
+            type: poiType,
+            latitude: lat,
+            longitude: lon,
+            speedLimit: vel,
+            roadName: rodovia.isNotEmpty ? rodovia : 'Via Pública',
+            city: municipio,
+            state: uf,
+            source: fonteNome,
+          ),
+        );
       }
       db.execute('COMMIT;');
     } catch (_) {
@@ -438,41 +486,63 @@ class MultiSourceRadarBuilder {
   }
 
   /// Deduplica a lista consolidada de POIs garantindo fusão inteligente em raio < [distanceThresholdMeters].
+  /// Utiliza indexação espacial por grade (Spatial Hashing O(N)) para processar mais de 70.000 pontos em milissegundos.
   List<PoiPoint> deduplicatePois(
     List<PoiPoint> pois, {
     double distanceThresholdMeters = 35.0,
   }) {
     final List<PoiPoint> retained = [];
+    // Grade de ~550 metros para busca de vizinhança imediata
+    const double gridStep = 0.005;
+    final Map<int, List<int>> spatialGrid = {};
+
+    int getCellKey(int latBin, int lonBin) {
+      return ((latBin & 0xFFFF) << 16) | (lonBin & 0xFFFF);
+    }
 
     for (final candidate in pois) {
+      final latBin = (candidate.latitude / gridStep).floor();
+      final lonBin = (candidate.longitude / gridStep).floor();
+
       int duplicateIndex = -1;
 
-      for (int i = 0; i < retained.length; i++) {
-        final existing = retained[i];
+      // Percorre os 9 blocos adjacentes (bloco central + 8 vizinhos)
+      outerLoop:
+      for (int dLat = -1; dLat <= 1; dLat++) {
+        for (int dLon = -1; dLon <= 1; dLon++) {
+          final cellKey = getCellKey(latBin + dLat, lonBin + dLon);
+          final candidatesInCell = spatialGrid[cellKey];
+          if (candidatesInCell == null) continue;
 
-        final distance = haversineDistance(
-          candidate.latitude,
-          candidate.longitude,
-          existing.latitude,
-          existing.longitude,
-        );
+          for (final idx in candidatesInCell) {
+            final existing = retained[idx];
 
-        if (distance <= distanceThresholdMeters) {
-          // Se são de naturezas completamente distintas (ex: pedágio vs quebra-molas), não fundir
-          if (!_areTypesCompatible(candidate.type, existing.type)) {
-            continue;
-          }
+            final distance = haversineDistance(
+              candidate.latitude,
+              candidate.longitude,
+              existing.latitude,
+              existing.longitude,
+            );
 
-          // Se ambos possuem direção definida e sentidos opostos (>60 graus), preservar ambos
-          if (candidate.direction != null && existing.direction != null) {
-            final diff = bearingDifference(candidate.direction!, existing.direction!);
-            if (diff > 60.0) {
-              continue;
+            if (distance <= distanceThresholdMeters) {
+              if (!_areTypesCompatible(candidate.type, existing.type)) {
+                continue;
+              }
+
+              if (candidate.direction != null && existing.direction != null) {
+                final diff = bearingDifference(
+                  candidate.direction!,
+                  existing.direction!,
+                );
+                if (diff > 60.0) {
+                  continue;
+                }
+              }
+
+              duplicateIndex = idx;
+              break outerLoop;
             }
           }
-
-          duplicateIndex = i;
-          break;
         }
       }
 
@@ -482,11 +552,18 @@ class MultiSourceRadarBuilder {
         final merged = _mergePoiPoints(existing, candidate);
         retained[duplicateIndex] = merged;
       } else {
+        final newIndex = retained.length;
         retained.add(candidate);
+        final cellKey = getCellKey(latBin, lonBin);
+        spatialGrid.putIfAbsent(cellKey, () => []).add(newIndex);
       }
     }
 
-    return retained;
+    final List<PoiPoint> reindexed = [];
+    for (int i = 0; i < retained.length; i++) {
+      reindexed.add(retained[i].copyWith(id: i + 1));
+    }
+    return reindexed;
   }
 
   /// Salva os POIs consolidados nas tabelas `pois` e `pois_index` com R*Tree e atualiza sumários.
@@ -509,7 +586,10 @@ class MultiSourceRadarBuilder {
     final updateTime = lastUpdated ?? DateTime.now().toUtc();
     dbManager.setMetadata('total_count', pois.length.toString());
     dbManager.setMetadata('last_updated', updateTime.toIso8601String());
-    dbManager.setMetadata('source', 'Multi-Source Brasil (ANTT, DNIT, OpenStreetMap)');
+    dbManager.setMetadata(
+      'source',
+      'Multi-Source Brasil (ANTT, DNIT, OpenStreetMap)',
+    );
     dbManager.setMetadata('schema_version', '2');
 
     // Atualiza tabela source_summary
@@ -533,16 +613,24 @@ class MultiSourceRadarBuilder {
 
   bool _areTypesCompatible(PoiType a, PoiType b) {
     if (a == b) return true;
-    final isRadarA = a == PoiType.fixedRadar || a == PoiType.trafficLightRadar || a == PoiType.redLightCamera;
-    final isRadarB = b == PoiType.fixedRadar || b == PoiType.trafficLightRadar || b == PoiType.redLightCamera;
+    final isRadarA =
+        a == PoiType.fixedRadar ||
+        a == PoiType.trafficLightRadar ||
+        a == PoiType.redLightCamera;
+    final isRadarB =
+        b == PoiType.fixedRadar ||
+        b == PoiType.trafficLightRadar ||
+        b == PoiType.redLightCamera;
     if (isRadarA && isRadarB) return true;
 
     final isTollA = a == PoiType.tollBooth || a == PoiType.freeFlowToll;
     final isTollB = b == PoiType.tollBooth || b == PoiType.freeFlowToll;
     if (isTollA && isTollB) return true;
 
-    final isBumpA = a == PoiType.physicalSpeedBump || a == PoiType.electronicSpeedBump;
-    final isBumpB = b == PoiType.physicalSpeedBump || b == PoiType.electronicSpeedBump;
+    final isBumpA =
+        a == PoiType.physicalSpeedBump || a == PoiType.electronicSpeedBump;
+    final isBumpB =
+        b == PoiType.physicalSpeedBump || b == PoiType.electronicSpeedBump;
     if (isBumpA && isBumpB) return true;
 
     return false;
@@ -552,14 +640,19 @@ class MultiSourceRadarBuilder {
     final speed = a.speedLimit ?? b.speedLimit;
     final direction = a.direction ?? b.direction;
     final road = a.roadName.isNotEmpty ? a.roadName : b.roadName;
-    final operator = (a.operator != null && a.operator!.isNotEmpty) ? a.operator : b.operator;
+    final operator = (a.operator != null && a.operator!.isNotEmpty)
+        ? a.operator
+        : b.operator;
     final city = (a.city != null && a.city!.isNotEmpty) ? a.city : b.city;
     final state = (a.state != null && a.state!.isNotEmpty) ? a.state : b.state;
     final toll = a.tollFeeCar ?? b.tollFeeCar;
 
-    final chosenType = (a.speedLimit != null && a.type == PoiType.trafficLightRadar)
+    final chosenType =
+        (a.speedLimit != null && a.type == PoiType.trafficLightRadar)
         ? a.type
-        : ((b.speedLimit != null && b.type == PoiType.trafficLightRadar) ? b.type : a.type);
+        : ((b.speedLimit != null && b.type == PoiType.trafficLightRadar)
+              ? b.type
+              : a.type);
 
     final src = (a.source != null && b.source != null && a.source != b.source)
         ? '${a.source} + ${b.source}'
