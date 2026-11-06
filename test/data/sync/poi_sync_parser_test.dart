@@ -179,5 +179,40 @@ void main() {
       expect(result.length, equals(2));
       expect(result.map((p) => p.id), containsAll([10, 20]));
     });
+
+    test('deduplicatePois NÃO deve descartar POIs de tipos incompatíveis próximos (<35m)', () {
+      final mixedPois = [
+        const PoiPoint(
+          id: 100,
+          type: PoiType.fixedRadar,
+          latitude: -23.55000,
+          longitude: -46.63000,
+          speedLimit: 60,
+        ),
+        // Lombada física a 10 metros do radar (não deve ser eliminada!)
+        const PoiPoint(
+          id: 101,
+          type: PoiType.physicalSpeedBump,
+          latitude: -23.55008,
+          longitude: -46.63002,
+        ),
+        // Pedágio a 15 metros (não deve ser eliminado!)
+        const PoiPoint(
+          id: 102,
+          type: PoiType.tollBooth,
+          latitude: -23.55010,
+          longitude: -46.63005,
+        ),
+      ];
+
+      final result = PoiSyncParser.deduplicatePois(mixedPois, clusterRadiusMeters: 35.0);
+
+      expect(result.length, equals(3));
+      expect(result.map((p) => p.type), containsAll([
+        PoiType.fixedRadar,
+        PoiType.physicalSpeedBump,
+        PoiType.tollBooth,
+      ]));
+    });
   });
 }

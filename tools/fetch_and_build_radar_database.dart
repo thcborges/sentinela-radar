@@ -14,8 +14,14 @@ const String kAnttPedagiosUrl =
 const String kAnttRadaresUrl =
     'https://dados.antt.gov.br/dataset/79d287f4-f5ca-4385-a17c-f61f53831f17/resource/81c5895f-7e59-4397-ad25-43c87d3acef5/download/dados-dos-radares10_2026.json';
 
+const String kPrfRadaresUrl =
+    'https://script.google.com/macros/s/AKfycbwnuoKDXO_3-d5hp-FSLBDRxZQhsC-WHTPIEKthAUNEDA6xsWH6EWZiE6HDz2vDZQOS2g/exec';
+
 const String kOpenClawUfUrl =
     'https://servidor3.lucas.inf.br/openclaw/radar/api.pse?rota=/api/v1/status/estados/';
+
+const String kPrfFallbackJson = 'assets/db/prf_radares.json';
+const String kDnitFallbackJson = 'assets/db/dnit_pncv.json';
 
 final List<String> kMajorUfs = [
   'SP',
@@ -107,7 +113,7 @@ Future<void> main(List<String> args) async {
   };
 
   // 1. ANTT Praças de Pedágio
-  stdout.writeln('[Fonte 1/4] Coletando Praças de Pedágio ANTT...');
+  stdout.writeln('[Fonte 1/6] Coletando Praças de Pedágio ANTT...');
   List<dynamic> anttPedagiosRaw = [];
   if (!offlineOnly) {
     try {
@@ -137,7 +143,7 @@ Future<void> main(List<String> args) async {
   );
 
   // 2. ANTT Radares
-  stdout.writeln('[Fonte 2/4] Coletando Radares de Velocidade ANTT...');
+  stdout.writeln('[Fonte 2/6] Coletando Radares de Velocidade ANTT...');
   List<dynamic> anttRadaresRaw = [];
   if (!offlineOnly) {
     try {
@@ -166,9 +172,71 @@ Future<void> main(List<String> args) async {
     '  -> ANTT Radares salvos na tabela source_antt_radares: ${anttRadaresPoints.length} radares',
   );
 
-  // 3. Cadastro Nacional Aberto (OpenClaw / DNIT / DERs / CETs)
+  // 3. PRF Radares Federais Oficiais
   stdout.writeln(
-    '[Fonte 3/4] Coletando Cadastro Nacional Aberto de Fiscalização (Paginação Completa 27 UFs)...',
+    '[Fonte 3/6] Coletando Radares Federais da Polícia Rodoviária Federal (PRF)...',
+  );
+  List<dynamic> prfRaw = [];
+  if (!offlineOnly) {
+    try {
+      final resp = await client
+          .get(Uri.parse(kPrfRadaresUrl), headers: requestHeaders)
+          .timeout(const Duration(seconds: 25));
+      if (resp.statusCode == 200) {
+        final decoded = jsonDecode(resp.body);
+        if (decoded is Map && decoded['records'] is List) {
+          prfRaw = decoded['records'] as List;
+        } else if (decoded is List) {
+          prfRaw = decoded;
+        }
+      }
+    } catch (e) {
+      stdout.writeln('  Aviso: Falha ao baixar dados online da PRF ($e).');
+    }
+  }
+  if (prfRaw.isEmpty && File(kPrfFallbackJson).existsSync()) {
+    try {
+      final fallbackStr = File(kPrfFallbackJson).readAsStringSync();
+      final decoded = jsonDecode(fallbackStr);
+      if (decoded is List) {
+        prfRaw = decoded;
+      } else if (decoded is Map && decoded['records'] is List) {
+        prfRaw = decoded['records'] as List;
+      }
+      stdout.writeln('  -> Carregados dados de fallback PRF: ${prfRaw.length} registros');
+    } catch (_) {}
+  }
+  final prfPoints = builder.ingestPrfRadares(rawDb, prfRaw);
+  allPois.addAll(prfPoints);
+  sourceSummaries['source_prf_radares'] = prfPoints.length;
+  stdout.writeln(
+    '  -> PRF Radares salvos na tabela source_prf_radares: ${prfPoints.length} radares',
+  );
+
+  // 4. DNIT PNCV Controle de Velocidade
+  stdout.writeln(
+    '[Fonte 4/6] Coletando Controle de Velocidade DNIT PNCV...',
+  );
+  List<dynamic> dnitRaw = [];
+  if (File(kDnitFallbackJson).existsSync()) {
+    try {
+      final str = File(kDnitFallbackJson).readAsStringSync();
+      final decoded = jsonDecode(str);
+      if (decoded is List) {
+        dnitRaw = decoded;
+      }
+    } catch (_) {}
+  }
+  final dnitPoints = builder.ingestDnitPncv(rawDb, dnitRaw);
+  allPois.addAll(dnitPoints);
+  sourceSummaries['source_dnit_pncv'] = dnitPoints.length;
+  stdout.writeln(
+    '  -> DNIT PNCV salvos na tabela source_dnit_pncv: ${dnitPoints.length} radares e redutores',
+  );
+
+  // 5. Cadastro Nacional Aberto (OpenClaw / DNIT / DERs / CETs)
+  stdout.writeln(
+    '[Fonte 5/6] Coletando Cadastro Nacional Aberto de Fiscalização (Paginação Completa 27 UFs)...',
   );
   List<dynamic> nacionalRaw = [];
   if (!offlineOnly) {
@@ -225,8 +293,8 @@ Future<void> main(List<String> args) async {
     '  -> Cadastro Nacional salvo na tabela source_nacional_aberto: ${nacionalPoints.length} pontos',
   );
 
-  // 4. OpenStreetMap Comunitário (Fallback para snapshot/cache local)
-  stdout.writeln('[Fonte 4/4] Carregando base OpenStreetMap comunitária...');
+  // 6. OpenStreetMap Comunitário (Fallback para snapshot/cache local)
+  stdout.writeln('[Fonte 6/6] Carregando base OpenStreetMap comunitária...');
   List<PoiPoint> osmPoints = [];
   final sourceFile = File(sourceJson);
   if (sourceFile.existsSync()) {
