@@ -79,7 +79,49 @@ class MultiSourceRadarBuilder {
       );
     ''');
 
-    // 4. Tabela individual OpenStreetMap Comunitário
+    // 4. Tabela individual PRF Radares Federais
+    db.execute('''
+      CREATE TABLE IF NOT EXISTS source_prf_radares (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        identificador TEXT,
+        concessionaria TEXT,
+        rodovia TEXT,
+        uf TEXT,
+        km REAL,
+        municipio TEXT,
+        sentido TEXT,
+        faixas INTEGER,
+        tipo_equipamento TEXT,
+        latitude REAL NOT NULL,
+        longitude REAL NOT NULL,
+        velocidade_leve INTEGER,
+        velocidade_pesado INTEGER,
+        situacao TEXT,
+        ingested_at TEXT NOT NULL
+      );
+    ''');
+
+    // 5. Tabela individual DNIT PNCV Controle de Velocidade
+    db.execute('''
+      CREATE TABLE IF NOT EXISTS source_dnit_pncv (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        codigo TEXT,
+        uf TEXT,
+        rodovia TEXT,
+        km REAL,
+        municipio TEXT,
+        faixas TEXT,
+        tipo TEXT,
+        marca_modelo TEXT,
+        latitude REAL NOT NULL,
+        longitude REAL NOT NULL,
+        velocidade INTEGER,
+        situacao TEXT,
+        ingested_at TEXT NOT NULL
+      );
+    ''');
+
+    // 6. Tabela individual OpenStreetMap Comunitário
     db.execute('''
       CREATE TABLE IF NOT EXISTS source_osm_comunitario (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -95,7 +137,7 @@ class MultiSourceRadarBuilder {
       );
     ''');
 
-    // 5. Tabela de Sumário e Rastreabilidade das Fontes
+    // 7. Tabela de Sumário e Rastreabilidade das Fontes
     db.execute('''
       CREATE TABLE IF NOT EXISTS source_summary (
         source_name TEXT PRIMARY KEY,
@@ -105,7 +147,7 @@ class MultiSourceRadarBuilder {
       );
     ''');
 
-    // 6. Inicializa o esquema de POIs padrão e índice espacial R*Tree do Sentinela
+    // 8. Inicializa o esquema de POIs padrão e índice espacial R*Tree do Sentinela
     final dbManager = DatabaseManager(db);
     dbManager.initializeSchema();
   }
@@ -432,6 +474,216 @@ class MultiSourceRadarBuilder {
             city: municipio,
             state: uf,
             source: fonteNome,
+          ),
+        );
+      }
+      db.execute('COMMIT;');
+    } catch (_) {
+      db.execute('ROLLBACK;');
+      rethrow;
+    } finally {
+      stmt.close();
+    }
+
+    return points;
+  }
+
+  /// Ingestão e persistência na tabela `source_prf_radares`.
+  List<PoiPoint> ingestPrfRadares(Database db, List<dynamic> records) {
+    if (records.isEmpty) return [];
+
+    final stmt = db.prepare('''
+      INSERT INTO source_prf_radares (
+        identificador, concessionaria, rodovia, uf, km,
+        municipio, sentido, faixas, tipo_equipamento,
+        latitude, longitude, velocidade_leve, velocidade_pesado,
+        situacao, ingested_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    ''');
+
+    final now = DateTime.now().toUtc().toIso8601String();
+    final List<PoiPoint> points = [];
+
+    db.execute('BEGIN TRANSACTION;');
+    try {
+      int sequenceId = 400000;
+      for (final raw in records) {
+        if (raw is! Map) continue;
+        final map = raw as Map<String, dynamic>;
+
+        final latVal = map['LATITUDE'];
+        final lonVal = map['LONGITUDE'];
+        final lat = (latVal is num)
+            ? latVal.toDouble()
+            : double.tryParse(latVal?.toString().replaceAll(',', '.') ?? '');
+        final lon = (lonVal is num)
+            ? lonVal.toDouble()
+            : double.tryParse(lonVal?.toString().replaceAll(',', '.') ?? '');
+        if (lat == null || lon == null || lat == 0.0 || lon == 0.0) continue;
+
+        final id = map['IDENTIFICADOR']?.toString() ?? '';
+        final conc = map['CONCESSIONÁRIA']?.toString() ?? '';
+        final br = map['BR']?.toString() ?? '';
+        final rodovia = br.isNotEmpty ? (br.startsWith('BR-') ? br : 'BR-$br') : '';
+        final uf = map['UF']?.toString() ?? '';
+        final kmStr = map['LOCAL']?.toString() ?? '';
+        final km = double.tryParse(kmStr.replaceAll(',', '.'));
+        final mun = map['MUNICÍPIO']?.toString() ?? '';
+        final sentido = map['SENTIDO']?.toString() ?? '';
+        final faixasStr = map['FAIXAS']?.toString() ?? '1';
+        final faixas = int.tryParse(faixasStr) ?? 1;
+        final tipoEquip = map['TIPO EQUIPAMENTO']?.toString() ?? 'CONTROLADOR';
+
+        final velLeveStr = map['VELOCIDADE LEVE']?.toString() ?? '';
+        final velPesadoStr = map['VELOCIDADE PESADO']?.toString() ?? '';
+        final velLeve = int.tryParse(velLeveStr);
+        final velPesado = int.tryParse(velPesadoStr);
+        final vel = velLeve ?? velPesado;
+
+        final situacao = map['ESTADO']?.toString() ?? 'ATIVO';
+
+        stmt.execute([
+          id,
+          conc,
+          rodovia,
+          uf,
+          km,
+          mun,
+          sentido,
+          faixas,
+          tipoEquip,
+          lat,
+          lon,
+          velLeve,
+          velPesado,
+          situacao,
+          now,
+        ]);
+
+        final lowerTipo = tipoEquip.toLowerCase();
+        final PoiType poiType;
+        if (lowerTipo.contains('redutor') || lowerTipo.contains('lombada')) {
+          poiType = PoiType.electronicSpeedBump;
+        } else if (lowerTipo.contains('portatil') || lowerTipo.contains('movel')) {
+          poiType = PoiType.mobileRadar;
+        } else {
+          poiType = PoiType.fixedRadar;
+        }
+
+        sequenceId++;
+        points.add(
+          PoiPoint(
+            id: sequenceId,
+            type: poiType,
+            latitude: lat,
+            longitude: lon,
+            speedLimit: vel,
+            roadName: rodovia.isNotEmpty ? rodovia : 'Rodovia Federal',
+            operator: conc.isNotEmpty ? conc : 'Polícia Rodoviária Federal',
+            city: mun,
+            state: uf,
+            source: 'PRF_RADARES_FIXOS',
+          ),
+        );
+      }
+      db.execute('COMMIT;');
+    } catch (_) {
+      db.execute('ROLLBACK;');
+      rethrow;
+    } finally {
+      stmt.close();
+    }
+
+    return points;
+  }
+
+  /// Ingestão e persistência na tabela `source_dnit_pncv`.
+  List<PoiPoint> ingestDnitPncv(Database db, List<dynamic> records) {
+    if (records.isEmpty) return [];
+
+    final stmt = db.prepare('''
+      INSERT INTO source_dnit_pncv (
+        codigo, uf, rodovia, km, municipio,
+        faixas, tipo, marca_modelo, latitude, longitude,
+        velocidade, situacao, ingested_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    ''');
+
+    final now = DateTime.now().toUtc().toIso8601String();
+    final List<PoiPoint> points = [];
+
+    db.execute('BEGIN TRANSACTION;');
+    try {
+      int sequenceId = 500000;
+      for (final raw in records) {
+        if (raw is! Map) continue;
+        final map = raw as Map<String, dynamic>;
+
+        final latVal = map['latitude'] ?? map['LATITUDE'];
+        final lonVal = map['longitude'] ?? map['LONGITUDE'];
+        final lat = (latVal is num)
+            ? latVal.toDouble()
+            : double.tryParse(latVal?.toString().replaceAll(',', '.') ?? '');
+        final lon = (lonVal is num)
+            ? lonVal.toDouble()
+            : double.tryParse(lonVal?.toString().replaceAll(',', '.') ?? '');
+        if (lat == null || lon == null || lat == 0.0 || lon == 0.0) continue;
+
+        final codigo = map['codigo']?.toString() ?? map['Código Identificação']?.toString() ?? '';
+        final uf = map['uf']?.toString() ?? map['UF']?.toString() ?? '';
+        final br = map['rodovia']?.toString() ?? map['Rodovia']?.toString() ?? '';
+        final rodovia = br.isNotEmpty ? (br.startsWith('BR-') ? br : 'BR-$br') : '';
+        final kmStr = map['km']?.toString() ?? map['Km']?.toString() ?? '';
+        final km = double.tryParse(kmStr.replaceAll(',', '.'));
+        final mun = map['municipio']?.toString() ?? map['Município']?.toString() ?? '';
+        final faixas = map['faixas']?.toString() ?? map['Faixas']?.toString() ?? '';
+        final tipo = map['tipo']?.toString() ?? map['Tipo']?.toString() ?? 'RAD';
+        final marca = map['marca_modelo']?.toString() ?? map['Marca / Modelo']?.toString() ?? '';
+
+        final velStr = map['velocidade']?.toString() ?? map['Velocidade']?.toString() ?? '';
+        final vel = int.tryParse(velStr.replaceAll(RegExp(r'[^0-9]'), ''));
+
+        final situacao = map['situacao']?.toString() ?? 'Ativo';
+
+        stmt.execute([
+          codigo,
+          uf,
+          rodovia,
+          km,
+          mun,
+          faixas,
+          tipo,
+          marca,
+          lat,
+          lon,
+          vel,
+          situacao,
+          now,
+        ]);
+
+        final upperTipo = tipo.toUpperCase();
+        final PoiType poiType;
+        if (upperTipo.contains('REV') || upperTipo.contains('LOMBARDA') || upperTipo.contains('LOMBADA')) {
+          poiType = PoiType.electronicSpeedBump;
+        } else if (upperTipo.contains('SEMAFORO') || upperTipo.contains('SEMÁFORO')) {
+          poiType = PoiType.trafficLightRadar;
+        } else {
+          poiType = PoiType.fixedRadar;
+        }
+
+        sequenceId++;
+        points.add(
+          PoiPoint(
+            id: sequenceId,
+            type: poiType,
+            latitude: lat,
+            longitude: lon,
+            speedLimit: vel,
+            roadName: rodovia.isNotEmpty ? rodovia : 'Rodovia Federal',
+            operator: 'DNIT PNCV',
+            city: mun,
+            state: uf,
+            source: 'DNIT_PNCV',
           ),
         );
       }

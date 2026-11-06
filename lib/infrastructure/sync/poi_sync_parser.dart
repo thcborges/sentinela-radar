@@ -112,6 +112,11 @@ abstract class PoiSyncParser {
         );
 
         if (distance <= clusterRadiusMeters) {
+          // Tipos incompatíveis (ex: lombada próxima a radar ou pedágio) não são duplicatas
+          if (!_areTypesCompatible(candidate.type, existing.type)) {
+            continue;
+          }
+
           // Se ambos possuem direção definida e fiscalizam sentidos diferentes (ex: pista dupla oposta)
           if (candidate.direction != null && existing.direction != null) {
             final diff = bearingDifference(
@@ -136,5 +141,31 @@ abstract class PoiSyncParser {
     }
 
     return retained;
+  }
+
+  /// Verifica se dois tipos de POI são compatíveis para unificação espacial.
+  static bool _areTypesCompatible(PoiType a, PoiType b) {
+    if (a == b) return true;
+    final isRadarA =
+        a == PoiType.fixedRadar ||
+        a == PoiType.trafficLightRadar ||
+        a == PoiType.redLightCamera;
+    final isRadarB =
+        b == PoiType.fixedRadar ||
+        b == PoiType.trafficLightRadar ||
+        b == PoiType.redLightCamera;
+    if (isRadarA && isRadarB) return true;
+
+    final isTollA = a == PoiType.tollBooth || a == PoiType.freeFlowToll;
+    final isTollB = b == PoiType.tollBooth || b == PoiType.freeFlowToll;
+    if (isTollA && isTollB) return true;
+
+    final isBumpA =
+        a == PoiType.physicalSpeedBump || a == PoiType.electronicSpeedBump;
+    final isBumpB =
+        b == PoiType.physicalSpeedBump || b == PoiType.electronicSpeedBump;
+    if (isBumpA && isBumpB) return true;
+
+    return false;
   }
 }
