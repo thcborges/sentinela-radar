@@ -46,11 +46,12 @@ jobs:
 
       - name: Gerar Checksums SHA-256 dos Binários e Banco de Dados
         run: |
-          mkdir -p build/release-checksums
-          cd build/app/outputs
-          find bundle flutter-apk -type f \( -name "*.aab" -o -name "*.apk" \) -exec sha256sum {} + > ../../release-checksums/SHA256SUMS.txt
-          cd ../..
-          sha256sum assets/db/sentinela_brasil.db >> build/release-checksums/SHA256SUMS.txt
+          WORKSPACE_ROOT="$(pwd)"
+          mkdir -p "$WORKSPACE_ROOT/build/release-checksums"
+          cd "$WORKSPACE_ROOT/build/app/outputs"
+          find bundle flutter-apk -type f \( -name "*.aab" -o -name "*.apk" \) -exec sha256sum {} + > "$WORKSPACE_ROOT/build/release-checksums/SHA256SUMS.txt"
+          cd "$WORKSPACE_ROOT"
+          sha256sum assets/db/sentinela_brasil.db >> "$WORKSPACE_ROOT/build/release-checksums/SHA256SUMS.txt"
 
       - name: Upload Release App Bundle
         uses: actions/upload-artifact@v4
